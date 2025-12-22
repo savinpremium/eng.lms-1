@@ -1,53 +1,93 @@
 
+import { initializeApp } from "firebase/app";
+import { getDatabase, ref, set, get, push, update, onValue, child } from "firebase/database";
 import { Student, AttendanceRecord, PaymentRecord } from '../types';
 
-const KEYS = {
-  STUDENTS: 'englms_students',
-  ATTENDANCE: 'englms_attendance',
-  PAYMENTS: 'englms_payments',
-  OTP: 'englms_otp'
+const firebaseConfig = {
+  apiKey: "AIzaSyDneDiUzFALG_DcH1gNJmzB0WIddQcDxsA",
+  authDomain: "lms-e-6f847.firebaseapp.com",
+  databaseURL: "https://lms-e-6f847-default-rtdb.firebaseio.com",
+  projectId: "lms-e-6f847",
+  storageBucket: "lms-e-6f847.firebasestorage.app",
+  messagingSenderId: "500541616456",
+  appId: "1:500541616456:web:db41d2f2b2be2787c0c37d",
+  measurementId: "G-X4PS6F2YJ6"
 };
 
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
 export const storageService = {
-  getStudents: (): Student[] => JSON.parse(localStorage.getItem(KEYS.STUDENTS) || '[]'),
+  // Students
+  getStudents: async (): Promise<Student[]> => {
+    const dbRef = ref(db);
+    const snapshot = await get(child(dbRef, 'students'));
+    if (snapshot.exists()) {
+      return Object.values(snapshot.val());
+    }
+    return [];
+  },
+
+  listenStudents: (callback: (students: Student[]) => void) => {
+    const studentsRef = ref(db, 'students');
+    return onValue(studentsRef, (snapshot) => {
+      if (snapshot.exists()) {
+        callback(Object.values(snapshot.val()));
+      } else {
+        callback([]);
+      }
+    });
+  },
   
-  saveStudent: (student: Student) => {
-    const students = storageService.getStudents();
-    students.push(student);
-    localStorage.setItem(KEYS.STUDENTS, JSON.stringify(students));
+  saveStudent: async (student: Student) => {
+    await set(ref(db, `students/${student.id}`), student);
   },
 
-  updateStudent: (updated: Student) => {
-    const students = storageService.getStudents().map(s => s.id === updated.id ? updated : s);
-    localStorage.setItem(KEYS.STUDENTS, JSON.stringify(students));
+  updateStudent: async (updated: Student) => {
+    await update(ref(db, `students/${updated.id}`), updated);
   },
 
-  getAttendance: (): AttendanceRecord[] => JSON.parse(localStorage.getItem(KEYS.ATTENDANCE) || '[]'),
-
-  addAttendance: (record: AttendanceRecord) => {
-    const records = storageService.getAttendance();
-    records.push(record);
-    localStorage.setItem(KEYS.ATTENDANCE, JSON.stringify(records));
+  // Attendance
+  getAttendance: async (): Promise<AttendanceRecord[]> => {
+    const snapshot = await get(ref(db, 'attendance'));
+    if (snapshot.exists()) {
+      return Object.values(snapshot.val());
+    }
+    return [];
   },
 
-  getPayments: (): PaymentRecord[] => JSON.parse(localStorage.getItem(KEYS.PAYMENTS) || '[]'),
-
-  addPayment: (record: PaymentRecord) => {
-    const records = storageService.getPayments();
-    records.push(record);
-    localStorage.setItem(KEYS.PAYMENTS, JSON.stringify(records));
+  addAttendance: async (record: AttendanceRecord) => {
+    const newRecordRef = push(ref(db, 'attendance'));
+    await set(newRecordRef, { ...record, id: newRecordRef.key });
   },
 
-  generateOTP: (): string => {
+  // Payments
+  getPayments: async (): Promise<PaymentRecord[]> => {
+    const snapshot = await get(ref(db, 'payments'));
+    if (snapshot.exists()) {
+      return Object.values(snapshot.val());
+    }
+    return [];
+  },
+
+  addPayment: async (record: PaymentRecord) => {
+    const newRecordRef = push(ref(db, 'payments'));
+    await set(newRecordRef, { ...record, id: newRecordRef.key });
+  },
+
+  // Auth / OTP (Transient Storage)
+  generateOTP: async (): Promise<string> => {
     const otp = Math.floor(1000 + Math.random() * 9000).toString();
     const expiry = Date.now() + 5 * 60 * 1000;
-    localStorage.setItem(KEYS.OTP, JSON.stringify({ otp, expiry }));
+    await set(ref(db, 'system/otp'), { otp, expiry });
     return otp;
   },
 
-  validateOTP: (input: string): boolean => {
-    const data = JSON.parse(localStorage.getItem(KEYS.OTP) || '{}');
-    if (!data.otp || Date.now() > data.expiry) return false;
-    return data.otp === input;
+  validateOTP: async (input: string): Promise<boolean> => {
+    const snapshot = await get(ref(db, 'system/otp'));
+    if (!snapshot.exists()) return false;
+    const { otp, expiry } = snapshot.val();
+    if (!otp || Date.now() > expiry) return false;
+    return otp === input;
   }
 };

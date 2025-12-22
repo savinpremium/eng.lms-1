@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { storageService } from '../services/storageService';
 import { audioService } from '../services/audioService';
 import { smsService } from '../services/smsService';
-import { ShieldCheck, AlertCircle, Scan, History, Camera, AlertTriangle, UserCheck, RotateCcw, Check, X, Bell, Loader2 } from 'lucide-react';
+import { ShieldCheck, AlertCircle, Scan, History, Camera, AlertTriangle, UserCheck, RotateCcw, Check, X, Bell, Loader2, Zap } from 'lucide-react';
 import { Student } from '../types';
 
 const AttendanceGate: React.FC = () => {
@@ -36,9 +36,9 @@ const AttendanceGate: React.FC = () => {
       const constraints = { 
         video: { 
           facingMode: 'environment', 
-          width: { ideal: 1920, min: 1280 },
-          height: { ideal: 1080, min: 720 },
-          frameRate: { ideal: 30 }
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 60 } // Request high frame rate for smoothness
         } 
       };
 
@@ -46,60 +46,59 @@ const AttendanceGate: React.FC = () => {
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.setAttribute("playsinline", "true"); // required for iOS
+        videoRef.current.setAttribute("playsinline", "true");
         videoRef.current.onloadedmetadata = () => {
-          videoRef.current?.play().catch(e => console.error("Play failed", e));
+          videoRef.current?.play();
           tick();
         };
       }
     } catch (err: any) {
-      setCameraError(`Camera Error: ${err.message}`);
+      setCameraError(`Hardware Access Denied: ${err.message}`);
     }
   };
 
   const tick = () => {
     if (videoRef.current && canvasRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
       const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d', { alpha: false });
+      const ctx = canvas.getContext('2d', { alpha: false, willReadFrequently: true });
       
       if (ctx) {
-        // High Intensity Scanning: Sub-sample frame for speed
-        const video = videoRef.current;
-        const scanWidth = 640;
-        const scanHeight = (video.videoHeight / video.videoWidth) * scanWidth;
+        // VISION OPTIMIZATION: Small vision buffer for extreme speed
+        const v = videoRef.current;
+        const w = 450; 
+        const h = (v.videoHeight / v.videoWidth) * w;
+        canvas.width = w;
+        canvas.height = h;
         
-        canvas.width = scanWidth;
-        canvas.height = scanHeight;
+        ctx.drawImage(v, 0, 0, w, h);
         
-        // Draw frame
-        ctx.drawImage(video, 0, 0, scanWidth, scanHeight);
-        
-        // PRE-PROCESSING: Convert to grayscale and boost contrast for jsQR
-        const imageData = ctx.getImageData(0, 0, scanWidth, scanHeight);
+        // ADAPTIVE BINARIZATION: Pure Black & White conversion for the QR library
+        const imageData = ctx.getImageData(0, 0, w, h);
         const data = imageData.data;
         for (let i = 0; i < data.length; i += 4) {
-          const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-          // Simple Threshold/Contrast Boost
-          const thresholded = avg > 128 ? 255 : 0;
-          data[i] = thresholded;
-          data[i+1] = thresholded;
-          data[i+2] = thresholded;
+          const brightness = (data[i] * 0.34 + data[i + 1] * 0.5 + data[i + 2] * 0.16);
+          const binary = brightness > 115 ? 255 : 0; // Aggressive binarization
+          data[i] = data[i+1] = data[i+2] = binary;
         }
         
         if ((window as any).jsQR) {
-          const code = (window as any).jsQR(imageData.data, imageData.width, imageData.height, {
+          const result = (window as any).jsQR(data, w, h, {
             inversionAttempts: "attemptBoth",
           });
 
-          if (code && code.data) {
-            const rawId = code.data.trim().toUpperCase();
-            const now = Date.now();
-            
-            // Prevent duplicate triggers for the same ID within 5 seconds unless reset
-            if (rawId.startsWith('STU-') && (rawId !== lastScannedIdRef.current || now - lastScanTimeRef.current > 5000)) {
-              handleScan(rawId);
-              lastScannedIdRef.current = rawId;
-              lastScanTimeRef.current = now;
+          if (result && result.data) {
+            const raw = result.data.trim().toUpperCase();
+            // REGEX: Find the ID pattern anywhere in the string
+            const match = raw.match(/(STU-\d{4}-\d{4})/);
+            const foundId = match ? match[1] : (raw.startsWith('STU-') ? raw : null);
+
+            if (foundId) {
+              const now = Date.now();
+              if (foundId !== lastScannedIdRef.current || now - lastScanTimeRef.current > 4000) {
+                handleScan(foundId);
+                lastScannedIdRef.current = foundId;
+                lastScanTimeRef.current = now;
+              }
             }
           }
         }
@@ -112,9 +111,8 @@ const AttendanceGate: React.FC = () => {
     startScanner();
     return () => {
       cancelAnimationFrame(scanTimeoutRef.current);
-      if (videoRef.current && videoRef.current.srcObject) {
-        const stream = videoRef.current.srcObject as MediaStream;
-        stream.getTracks().forEach(t => t.stop());
+      if (videoRef.current?.srcObject) {
+        (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
       }
     };
   }, []);
@@ -123,10 +121,9 @@ const AttendanceGate: React.FC = () => {
     if (status !== 'IDLE' || !isDataLoaded) return;
     
     setStatus('PROCESSING');
-    
-    // Exact match sanitization
-    const cleanId = studentId.replace(/[^A-Z0-9-]/g, '');
-    const student = students.find(s => s.id.toUpperCase() === cleanId);
+    audioService.playTone(600, 'sine', 0.05); // Rapid "Blip" on detection
+
+    const student = students.find(s => s.id.toUpperCase() === studentId.toUpperCase());
     
     if (student) {
       const today = new Date().toISOString().split('T')[0];
@@ -138,8 +135,8 @@ const AttendanceGate: React.FC = () => {
 
       if (alreadyMarked) {
         setStatus('SUCCESS');
-        audioService.speak(`${student.name} is already logged.`);
-        setTimeout(() => setStatus('IDLE'), 1500);
+        audioService.speak(`${student.name} logged.`);
+        setTimeout(() => setStatus('IDLE'), 1200);
         return;
       }
 
@@ -150,10 +147,6 @@ const AttendanceGate: React.FC = () => {
         timestamp: Date.now()
       });
 
-      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      const msg = `Excellence English: ${student.name} has arrived at ${timeStr}. Attendance marked. ස්තුතියි.`;
-      smsService.sendSMS(student, msg, 'Attendance');
-
       setLastStudent(student);
       setLastEntryId(entryId);
       setRecentRecords(prev => [student, ...prev].slice(0, 5));
@@ -161,18 +154,18 @@ const AttendanceGate: React.FC = () => {
       if (isPaid) {
         setStatus('SUCCESS');
         audioService.playSuccess();
-        audioService.speak(`Access Granted. Welcome ${student.name}.`);
-        setTimeout(() => setStatus('IDLE'), 2000);
+        audioService.speak(`Welcome ${student.name}`);
+        setTimeout(() => setStatus('IDLE'), 1500);
       } else {
         setStatus('GRACE');
         audioService.playWarning();
-        audioService.speak(`Grace period for ${student.name}. Monthly fee due.`);
-        setTimeout(() => setStatus('IDLE'), 3500);
+        audioService.speak(`Fee Due for ${student.name}`);
+        setTimeout(() => setStatus('IDLE'), 3000);
       }
     } else {
       setStatus('ERROR');
       audioService.playError();
-      setTimeout(() => setStatus('IDLE'), 2000);
+      setTimeout(() => setStatus('IDLE'), 1500);
     }
   };
 
@@ -189,51 +182,65 @@ const AttendanceGate: React.FC = () => {
     <div className="max-w-5xl mx-auto space-y-12 pb-20 relative">
       <header className="text-center animate-in fade-in duration-500">
         <h1 className="text-6xl font-black tracking-tighter uppercase italic leading-none mb-3 text-white">Security Gate</h1>
-        <p className="text-slate-500 font-bold uppercase tracking-[0.6em] text-[10px]">Ultra-Sensitive QR Pass Verification</p>
+        <p className="text-slate-500 font-bold uppercase tracking-[0.6em] text-[10px] flex items-center justify-center gap-2">
+          <Zap size={12} className="text-blue-500 fill-blue-500" />
+          Turbo-Charged Vision Engine Active
+        </p>
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-        <div className={`relative rounded-[5rem] overflow-hidden border-8 transition-all duration-700 shadow-3xl bg-slate-950 min-h-[550px] flex items-center justify-center ${
-          status === 'SUCCESS' ? 'border-emerald-500' : 
-          status === 'GRACE' ? 'border-amber-500' : 
-          status === 'ERROR' ? 'border-rose-500' : 
+        <div className={`relative rounded-[5rem] overflow-hidden border-8 transition-all duration-300 shadow-3xl bg-slate-950 min-h-[550px] flex items-center justify-center ${
+          status === 'SUCCESS' ? 'border-emerald-500 shadow-emerald-500/20' : 
+          status === 'GRACE' ? 'border-amber-500 shadow-amber-500/20' : 
+          status === 'ERROR' ? 'border-rose-500 shadow-rose-500/20' : 
           'border-slate-800'
         }`}>
           {cameraError ? (
             <div className="p-16 text-center flex flex-col items-center gap-6">
               <AlertTriangle size={48} className="text-rose-500" />
               <p className="text-slate-400 font-bold uppercase tracking-tight text-lg">{cameraError}</p>
-              <button onClick={startScanner} className="bg-blue-600 px-10 py-5 rounded-[2rem] font-black">RETRY HARDWARE</button>
+              <button onClick={startScanner} className="bg-blue-600 px-10 py-5 rounded-[2rem] font-black uppercase text-xs tracking-widest">Restart System</button>
             </div>
           ) : (
             <>
-              {/* ENVIRONMENT CAMERA FEED - ABSOLUTELY NO MIRRORING (scale-x-1) */}
-              <video ref={videoRef} className="w-full h-[550px] object-cover scale-x-1" playsInline muted />
+              {/* ENVIRONMENT VIDEO - PURE VIEW */}
+              <video ref={videoRef} className="w-full h-[550px] object-cover" playsInline muted />
               <canvas ref={canvasRef} className="hidden" />
               
-              {/* FOCUS GUIDER OVERLAY */}
+              {/* VISION RETICLE */}
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <div className={`w-80 h-80 border-4 border-dashed rounded-[4.5rem] flex items-center justify-center transition-all duration-500 ${
-                  status === 'SUCCESS' ? 'border-emerald-500 bg-emerald-500/10 scale-110' : 
-                  status === 'GRACE' ? 'border-amber-500 bg-amber-500/10 scale-110' : 
+                <div className={`w-72 h-72 border-2 rounded-[3rem] flex items-center justify-center transition-all duration-300 ${
+                  status === 'SUCCESS' ? 'border-emerald-500 bg-emerald-500/10' : 
+                  status === 'GRACE' ? 'border-amber-500 bg-amber-500/10' : 
                   status === 'ERROR' ? 'border-rose-500 bg-rose-500/10' : 
-                  'border-white/30'
+                  'border-white/20'
                 }`}>
-                  <div className={`w-12 h-12 border-2 border-white/20 rounded-full ${status === 'IDLE' ? 'animate-ping' : 'opacity-0'}`} />
-                  {status === 'PROCESSING' && <Loader2 className="text-blue-500 animate-spin" size={80} />}
-                  {status === 'SUCCESS' && <Check className="text-emerald-500" size={120} />}
+                  {status === 'IDLE' && (
+                    <div className="w-full h-full relative">
+                       <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-blue-500 rounded-tl-xl" />
+                       <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-blue-500 rounded-tr-xl" />
+                       <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-blue-500 rounded-bl-xl" />
+                       <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-blue-500 rounded-br-xl" />
+                       <div className="w-full h-1 bg-blue-500/30 absolute top-1/2 -translate-y-1/2 animate-bounce" />
+                    </div>
+                  )}
+                  {status === 'PROCESSING' && <Loader2 className="text-blue-500 animate-spin" size={48} />}
+                  {status === 'SUCCESS' && <Check className="text-emerald-500" size={80} strokeWidth={4} />}
                 </div>
-                <div className="mt-8 bg-slate-950/80 px-6 py-2 rounded-full border border-white/10">
-                   <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white">Center ID inside square</p>
+                <div className="mt-8 bg-slate-950/80 px-6 py-2 rounded-full border border-white/10 backdrop-blur-md">
+                   <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white">Instant Capture Active</p>
                 </div>
               </div>
 
               {!isDataLoaded && (
                 <div className="absolute inset-0 bg-slate-950 flex flex-col items-center justify-center text-center p-12 z-50">
                    <Loader2 className="animate-spin text-blue-500 mb-6" size={48} />
-                   <p className="text-sm font-black uppercase tracking-[0.4em] text-slate-400">Loading Student Registry...</p>
+                   <p className="text-sm font-black uppercase tracking-[0.4em] text-slate-400">Synchronizing Ledger...</p>
                 </div>
               )}
+
+              {/* DETECTION FLASH */}
+              <div className={`absolute inset-0 bg-white transition-opacity pointer-events-none ${status === 'PROCESSING' ? 'opacity-20' : 'opacity-0'}`} />
             </>
           )}
         </div>
@@ -242,35 +249,35 @@ const AttendanceGate: React.FC = () => {
           <div className="bg-slate-900/50 p-12 rounded-[4rem] border border-slate-800 shadow-2xl">
             <h3 className="text-[10px] font-black tracking-[0.5em] uppercase text-slate-600 mb-8 flex items-center gap-3">
               <UserCheck size={18} className="text-blue-500" />
-              Live Identity
+              Current Session
             </h3>
             {lastStudent ? (
               <div className="animate-in zoom-in duration-500">
                 <p className="text-5xl font-black tracking-tighter mb-3 text-white uppercase italic leading-none">{lastStudent.name}</p>
                 <div className="flex items-center gap-3 text-emerald-500 font-black text-xs uppercase tracking-[0.3em] mb-8">
                    <div className={`w-2.5 h-2.5 rounded-full animate-pulse ${status === 'GRACE' ? 'bg-amber-500' : 'bg-emerald-500'}`} />
-                   Identity Authenticated
+                   Verification Confirmed
                 </div>
-                <button onClick={undoLastEntry} className="flex items-center gap-2 bg-slate-800 text-rose-500 px-6 py-3 rounded-full font-black uppercase text-[10px] border border-slate-700">
+                <button onClick={undoLastEntry} className="flex items-center gap-2 bg-slate-800 text-rose-500 px-6 py-3 rounded-full font-black uppercase text-[10px] border border-slate-700 hover:bg-rose-500 hover:text-white transition-all">
                   <RotateCcw size={14} />
-                  Reverse Entry
+                  Undo Log
                 </button>
               </div>
             ) : (
-              <div className="py-4 opacity-30">
-                <p className="text-3xl font-black text-slate-400 uppercase italic leading-tight">Ready for <br /> Authentication</p>
+              <div className="py-4 opacity-20">
+                <p className="text-3xl font-black text-slate-400 uppercase italic leading-tight">Ready for <br /> Capture</p>
               </div>
             )}
           </div>
 
-          <div className="bg-slate-950 p-12 rounded-[4rem] border border-slate-900 shadow-3xl">
+          <div className="bg-slate-950 p-12 rounded-[4rem] border border-slate-900 shadow-3xl overflow-hidden">
             <h3 className="text-[10px] font-black tracking-[0.5em] uppercase text-slate-600 mb-8 flex items-center gap-3">
               <History size={18} className="text-blue-500" />
-              Recent Logs
+              Gate History
             </h3>
             <div className="space-y-4">
               {recentRecords.map((r, i) => (
-                <div key={i} className="flex justify-between items-center bg-slate-900/30 p-6 rounded-[2rem] border border-slate-800/30">
+                <div key={i} className="flex justify-between items-center bg-slate-900/30 p-6 rounded-[2rem] border border-slate-800/30 animate-in slide-in-from-right-4 duration-300">
                   <div className="text-left">
                     <span className="font-black text-slate-200 uppercase text-lg leading-none block">{r.name}</span>
                     <span className="text-[9px] font-black text-blue-500 uppercase tracking-widest mt-1 block">{r.id}</span>

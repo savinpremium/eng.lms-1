@@ -5,7 +5,7 @@ import { audioService } from '../services/audioService';
 import { generateWhatsAppDraft } from '../services/geminiService';
 import { Student, PaymentRecord } from '../types';
 import { toPng } from 'html-to-image';
-import { Search, Printer, CreditCard, ChevronRight, User, Hash, ScanQrCode, X, CheckCircle, Loader2, Download, Sparkles } from 'lucide-react';
+import { Search, Printer, CreditCard, ChevronRight, User, Hash, ScanQrCode, X, CheckCircle, Loader2, Download, Sparkles, Zap } from 'lucide-react';
 
 const PaymentDesk: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -50,38 +50,42 @@ const PaymentDesk: React.FC = () => {
   const tick = () => {
     if (videoRef.current && canvasRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
       const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d', { alpha: false });
+      const ctx = canvas.getContext('2d', { alpha: false, willReadFrequently: true });
       if (ctx) {
-        // High Intensity Processing
-        const scanWidth = 640;
-        const scanHeight = (videoRef.current.videoHeight / videoRef.current.videoWidth) * scanWidth;
-        canvas.width = scanWidth;
-        canvas.height = scanHeight;
+        // High Speed Vision Down-sampling
+        const v = videoRef.current;
+        const w = 400; 
+        const h = (v.videoHeight / v.videoWidth) * w;
+        canvas.width = w;
+        canvas.height = h;
         
-        ctx.drawImage(videoRef.current, 0, 0, scanWidth, scanHeight);
-        const imageData = ctx.getImageData(0, 0, scanWidth, scanHeight);
-        
-        // Boost frame data
+        ctx.drawImage(v, 0, 0, w, h);
+        const imageData = ctx.getImageData(0, 0, w, h);
         const data = imageData.data;
+
+        // TURBO BINARIZATION
         for (let i = 0; i < data.length; i += 4) {
-          const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-          const val = avg > 120 ? 255 : 0;
-          data[i] = val; data[i+1] = val; data[i+2] = val;
+          const luma = (data[i] * 0.3 + data[i + 1] * 0.59 + data[i + 2] * 0.11);
+          const bin = luma > 110 ? 255 : 0;
+          data[i] = data[i+1] = data[i+2] = bin;
         }
         
         if ((window as any).jsQR) {
-          const code = (window as any).jsQR(imageData.data, imageData.width, imageData.height, {
-            inversionAttempts: "attemptBoth",
-          });
-
-          if (code && code.data && code.data.trim().toUpperCase().startsWith('STU-')) {
-            const cleanId = code.data.trim().toUpperCase();
-            const found = students.find(s => s.id.toUpperCase() === cleanId);
-            if (found) {
-              setSelectedStudent(found);
-              audioService.playSuccess();
-              stopScanner();
-              return;
+          const code = (window as any).jsQR(data, w, h, { inversionAttempts: "attemptBoth" });
+          if (code && code.data) {
+            const raw = code.data.trim().toUpperCase();
+            const match = raw.match(/(STU-\d{4}-\d{4})/);
+            const foundId = match ? match[1] : (raw.startsWith('STU-') ? raw : null);
+            
+            if (foundId) {
+              const found = students.find(s => s.id.toUpperCase() === foundId);
+              if (found) {
+                setSelectedStudent(found);
+                audioService.playSuccess();
+                audioService.playTone(800, 'sine', 0.1);
+                stopScanner();
+                return;
+              }
             }
           }
         }
@@ -96,7 +100,7 @@ const PaymentDesk: React.FC = () => {
     setIsScanning(true);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment', width: { ideal: 1920 } } 
+        video: { facingMode: 'environment', width: { ideal: 1280 } } 
       });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -132,7 +136,7 @@ const PaymentDesk: React.FC = () => {
       setLastReceipt({ ...payment, id });
       audioService.playCash();
     } catch (e) {
-      console.error("Payment failed", e);
+      console.error("Ledger sync failed", e);
     } finally {
       setIsProcessing(false);
     }
@@ -154,7 +158,7 @@ const PaymentDesk: React.FC = () => {
 
   const undoLastPayment = async () => {
     if (!lastReceipt || !selectedStudent) return;
-    if (!confirm("Reverse this entry?")) return;
+    if (!confirm("Reverse this ledger entry?")) return;
 
     await storageService.deletePayment(lastReceipt.id);
     const [year, month] = lastReceipt.month.split('-').map(Number);
@@ -197,16 +201,13 @@ const PaymentDesk: React.FC = () => {
           </div>
           <div style="font-size: 22px; font-weight: 900; margin-top: 20px;">TOTAL: LKR 1,000</div>
         </div>
-        <center>
-          <img src="${qrUrl}" style="width: 35mm; margin: 10px 0;" />
-        </center>
       </div>
     `;
 
     try {
-      await new Promise(r => setTimeout(r, 800));
+      await new Promise(r => setTimeout(r, 600));
       const node = document.getElementById('receipt-capture-target');
-      if (node) setPreviewImage(await toPng(node, { pixelRatio: 2 }));
+      if (node) setPreviewImage(await toPng(node, { pixelRatio: 2.5 }));
     } finally {
       setIsGenerating(false);
       buffer.innerHTML = '';
@@ -225,7 +226,10 @@ const PaymentDesk: React.FC = () => {
       <header className="flex justify-between items-center animate-in fade-in duration-500">
         <div>
           <h1 className="text-3xl md:text-5xl font-black tracking-tighter uppercase italic text-white">Fee Settlement</h1>
-          <p className="text-slate-500 font-bold uppercase text-[10px] tracking-[0.4em] mt-2">Class Fee Collection Desk</p>
+          <p className="text-slate-500 font-bold uppercase text-[10px] tracking-[0.4em] mt-2 flex items-center gap-2">
+            <Zap size={12} className="text-blue-500 fill-blue-500" />
+            Class Fee Transaction Terminal
+          </p>
         </div>
       </header>
 
@@ -234,7 +238,7 @@ const PaymentDesk: React.FC = () => {
           <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-500" size={24} />
           <input 
             placeholder="Search by name or ID..."
-            className="w-full bg-slate-900 border border-slate-800 rounded-2xl pl-16 pr-8 py-5 text-xl font-black focus:outline-none focus:border-blue-600 transition-all text-white"
+            className="w-full bg-slate-900 border border-slate-800 rounded-2xl pl-16 pr-8 py-5 text-xl font-black focus:outline-none focus:border-blue-600 transition-all text-white shadow-2xl"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -333,7 +337,7 @@ const PaymentDesk: React.FC = () => {
 
       {isScanning && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6 backdrop-blur-3xl bg-slate-950/80">
-          <div className="bg-slate-900 w-full max-w-xl p-8 rounded-[4rem] border border-slate-800 shadow-3xl overflow-hidden relative">
+          <div className="bg-slate-900 w-full max-w-xl p-8 rounded-[4rem] border border-slate-800 shadow-3xl overflow-hidden relative animate-in zoom-in duration-300">
             <button onClick={stopScanner} className="absolute top-6 right-6 z-10 w-12 h-12 bg-slate-950 rounded-full flex items-center justify-center text-slate-700 hover:text-white border border-slate-800">
               <X size={28} />
             </button>
@@ -343,11 +347,12 @@ const PaymentDesk: React.FC = () => {
             </div>
             
             <div className="relative rounded-[3rem] overflow-hidden border-8 border-slate-800 bg-black">
-              {/* BACK CAMERA FEED - NO MIRRORING */}
-              <video ref={videoRef} className="w-full h-[400px] object-cover scale-x-1" playsInline />
+              <video ref={videoRef} className="w-full h-[400px] object-cover" playsInline />
               <canvas ref={canvasRef} className="hidden" />
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-64 h-64 border-4 border-blue-600/60 rounded-[3rem] animate-pulse"></div>
+                <div className="w-64 h-64 border-2 border-blue-600/60 rounded-[3rem] animate-pulse">
+                   <div className="w-full h-1 bg-blue-500 absolute top-1/2 -translate-y-1/2 shadow-[0_0_15px_rgba(59,130,246,0.5)]" />
+                </div>
               </div>
             </div>
             
@@ -356,15 +361,15 @@ const PaymentDesk: React.FC = () => {
         </div>
       )}
 
-      {/* Receipt Pop-up */}
+      {/* Receipt Preview */}
       {previewImage && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-xl animate-in fade-in duration-300">
           <div className="bg-slate-900 border border-slate-800 rounded-[3rem] p-12 max-w-lg w-full shadow-3xl relative overflow-hidden animate-in zoom-in-95 duration-500">
             <button onClick={() => setPreviewImage(null)} className="absolute top-8 right-8 text-slate-500 hover:text-white transition-all z-20"><X size={32} /></button>
-            <div className="flex justify-center mb-10 bg-white p-4 rounded-3xl overflow-hidden"><img src={previewImage} className="w-full max-w-[280px]" alt="Receipt" /></div>
+            <div className="flex justify-center mb-10 bg-white p-4 rounded-3xl overflow-hidden shadow-2xl"><img src={previewImage} className="w-full max-w-[280px]" alt="Receipt" /></div>
             <div className="grid grid-cols-2 gap-4">
               <button onClick={() => window.print()} className="bg-blue-600 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-3 shadow-xl uppercase text-xs">Print</button>
-              <a href={previewImage} download="ClassFee.png" className="bg-slate-800 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-3 uppercase text-xs text-center">Download</a>
+              <a href={previewImage} download="ClassFee.png" className="bg-slate-800 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-3 uppercase text-xs text-center flex items-center justify-center">Download</a>
             </div>
           </div>
         </div>

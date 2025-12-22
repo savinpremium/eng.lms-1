@@ -1,14 +1,17 @@
 
 import React, { useState, useEffect } from 'react';
 import { storageService } from '../services/storageService';
+import { audioService } from '../services/audioService';
 import { Student, Page } from '../types';
 import { toPng } from 'html-to-image';
-import { UserPlus, Search, Printer, QrCode, Hash, Loader2 } from 'lucide-react';
+import { UserPlus, Search, Printer, QrCode, Hash, Loader2, Trash2, X, Printer as PrinterIcon, Download } from 'lucide-react';
 
 const StudentRegistry: React.FC<{ onNavigate: (page: Page) => void }> = ({ onNavigate }) => {
   const [students, setStudents] = useState<Student[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [printingId, setPrintingId] = useState<string | null>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [previewStudent, setPreviewStudent] = useState<Student | null>(null);
 
   useEffect(() => {
     return storageService.listenStudents(setStudents);
@@ -21,10 +24,10 @@ const StudentRegistry: React.FC<{ onNavigate: (page: Page) => void }> = ({ onNav
 
   const handlePrintCard = async (student: Student) => {
     setPrintingId(student.id);
+    setPreviewStudent(student);
     
     const buffer = document.getElementById('render-buffer');
-    const printSection = document.getElementById('print-section');
-    if (!buffer || !printSection) return;
+    if (!buffer) return;
 
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${student.id}`;
 
@@ -66,19 +69,33 @@ const StudentRegistry: React.FC<{ onNavigate: (page: Page) => void }> = ({ onNav
     `;
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const target = document.getElementById('registry-id-capture');
-      if (target) {
-        const dataUrl = await toPng(target, { pixelRatio: 3 });
-        printSection.innerHTML = `<img src="${dataUrl}" style="width: 85.6mm; height: 53.98mm;" />`;
-        window.print();
-        printSection.innerHTML = '';
+      await new Promise(resolve => setTimeout(resolve, 800));
+      const node = document.getElementById('registry-id-capture');
+      if (node) {
+        const dataUrl = await toPng(node, { pixelRatio: 3, skipFonts: true, fontEmbedCSS: '' });
+        setPreviewImage(dataUrl);
       }
     } catch (error) {
-      console.error('Failed to capture registry ID card image:', error);
+      console.error('Print capture failed:', error);
     } finally {
       buffer.innerHTML = '';
       setPrintingId(null);
+    }
+  };
+
+  const handlePrintActual = () => {
+    if (!previewImage) return;
+    const printSection = document.getElementById('print-section');
+    if (!printSection) return;
+    printSection.innerHTML = `<img src="${previewImage}" style="width: 85.6mm; height: 53.98mm;" />`;
+    window.print();
+    printSection.innerHTML = '';
+  };
+
+  const handleDelete = async (id: string, name: string) => {
+    if (confirm(`Are you sure you want to delete student "${name}"? This cannot be undone.`)) {
+      await storageService.deleteStudent(id);
+      audioService.playError();
     }
   };
 
@@ -128,11 +145,11 @@ const StudentRegistry: React.FC<{ onNavigate: (page: Page) => void }> = ({ onNav
                     <div className="flex items-center gap-2">
                        <span className="text-blue-500 font-black uppercase text-[9px] tracking-widest">{student.id}</span>
                        <span className="w-1 h-1 rounded-full bg-slate-700"></span>
-                       <span className="text-slate-600 font-bold text-[8px] uppercase tracking-widest">Enrolled: ${student.registrationDate}</span>
+                       <span className="text-slate-600 font-bold text-[8px] uppercase tracking-widest">Enrolled: {student.registrationDate}</span>
                     </div>
                   </td>
                   <td className="p-6 md:p-8">
-                    <span className="bg-slate-800 px-4 py-2 rounded-xl font-black text-[10px] text-slate-300 shadow-inner border border-slate-700 uppercase">${student.grade}</span>
+                    <span className="bg-slate-800 px-4 py-2 rounded-xl font-black text-[10px] text-slate-300 shadow-inner border border-slate-700 uppercase">{student.grade}</span>
                   </td>
                   <td className="p-6 md:p-8">
                     <div className="flex flex-col gap-1">
@@ -140,7 +157,7 @@ const StudentRegistry: React.FC<{ onNavigate: (page: Page) => void }> = ({ onNav
                         <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
                         Settled Cycle
                       </div>
-                      <p className="text-xs font-bold text-slate-400 pl-3">${student.lastPaymentMonth}</p>
+                      <p className="text-xs font-bold text-slate-400 pl-3">{student.lastPaymentMonth}</p>
                     </div>
                   </td>
                   <td className="p-6 md:p-8 text-right">
@@ -154,10 +171,11 @@ const StudentRegistry: React.FC<{ onNavigate: (page: Page) => void }> = ({ onNav
                         {printingId === student.id ? <Loader2 className="animate-spin" size={18} /> : <Printer size={18} />}
                       </button>
                       <button 
-                        className="w-10 h-10 md:w-12 md:h-12 bg-slate-950 text-slate-400 rounded-xl hover:bg-slate-800 flex items-center justify-center transition-all"
-                        title="View Full Ledger"
+                        onClick={() => handleDelete(student.id, student.name)}
+                        className="w-10 h-10 md:w-12 md:h-12 bg-slate-950 text-rose-500 rounded-xl hover:bg-rose-500 hover:text-white flex items-center justify-center transition-all shadow-xl"
+                        title="Delete Student"
                       >
-                        <Hash size={18} />
+                        <Trash2 size={18} />
                       </button>
                     </div>
                   </td>
@@ -176,6 +194,46 @@ const StudentRegistry: React.FC<{ onNavigate: (page: Page) => void }> = ({ onNav
           </div>
         )}
       </div>
+
+      {/* ID Card Pop-up Preview */}
+      {previewImage && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-xl animate-in fade-in duration-300">
+          <div className="bg-slate-900 border border-slate-800 rounded-[2.5rem] p-8 md:p-12 max-w-2xl w-full shadow-3xl relative overflow-hidden animate-in zoom-in-95 duration-500">
+            <button onClick={() => { setPreviewImage(null); setPreviewStudent(null); }} className="absolute top-8 right-8 text-slate-500 hover:text-white transition-all">
+              <X size={32} />
+            </button>
+            
+            <div className="text-center mb-10">
+              <h2 className="text-3xl font-black uppercase italic tracking-tighter mb-2">Institutional Pass</h2>
+              <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest">Personnel Registry Record</p>
+            </div>
+
+            <div className="flex justify-center mb-12">
+              <div className="bg-slate-950 p-2 rounded-2xl border border-slate-800 shadow-2xl">
+                <img src={previewImage} className="w-full max-w-sm rounded-xl shadow-2xl" alt="ID Card Preview" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <button 
+                onClick={handlePrintActual}
+                className="flex-1 bg-blue-600 text-white font-black py-5 rounded-2xl flex items-center justify-center gap-3 shadow-xl shadow-blue-600/20 hover:bg-blue-500 transition-all uppercase tracking-widest text-xs"
+              >
+                <PrinterIcon size={20} />
+                Print Image
+              </button>
+              <a 
+                href={previewImage} 
+                download={`${previewStudent?.id}_card.png`}
+                className="flex-1 bg-slate-800 text-white font-black py-5 rounded-2xl flex items-center justify-center gap-3 hover:bg-slate-700 transition-all uppercase tracking-widest text-xs"
+              >
+                <Download size={20} />
+                Download
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

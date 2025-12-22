@@ -1,6 +1,6 @@
 
 import { initializeApp } from "firebase/app";
-import { getDatabase, ref, set, get, push, update, onValue, child } from "firebase/database";
+import { getDatabase, ref, set, get, push, update, onValue, child, remove } from "firebase/database";
 import { Student, AttendanceRecord, PaymentRecord } from '../types';
 
 const firebaseConfig = {
@@ -47,6 +47,10 @@ export const storageService = {
     await update(ref(db, `students/${updated.id}`), updated);
   },
 
+  deleteStudent: async (id: string) => {
+    await remove(ref(db, `students/${id}`));
+  },
+
   // Attendance
   getAttendance: async (): Promise<AttendanceRecord[]> => {
     const snapshot = await get(ref(db, 'attendance'));
@@ -56,9 +60,26 @@ export const storageService = {
     return [];
   },
 
-  addAttendance: async (record: AttendanceRecord) => {
+  listenAttendance: (callback: (records: AttendanceRecord[]) => void) => {
+    const attRef = ref(db, 'attendance');
+    return onValue(attRef, (snapshot) => {
+      if (snapshot.exists()) {
+        callback(Object.values(snapshot.val()));
+      } else {
+        callback([]);
+      }
+    });
+  },
+
+  addAttendance: async (record: AttendanceRecord): Promise<string> => {
     const newRecordRef = push(ref(db, 'attendance'));
-    await set(newRecordRef, { ...record, id: newRecordRef.key });
+    const id = newRecordRef.key as string;
+    await set(newRecordRef, { ...record, id });
+    return id;
+  },
+
+  deleteAttendance: async (id: string) => {
+    await remove(ref(db, `attendance/${id}`));
   },
 
   // Payments
@@ -70,9 +91,26 @@ export const storageService = {
     return [];
   },
 
-  addPayment: async (record: PaymentRecord) => {
+  listenPayments: (callback: (records: PaymentRecord[]) => void) => {
+    const payRef = ref(db, 'payments');
+    return onValue(payRef, (snapshot) => {
+      if (snapshot.exists()) {
+        callback(Object.values(snapshot.val()));
+      } else {
+        callback([]);
+      }
+    });
+  },
+
+  addPayment: async (record: PaymentRecord): Promise<string> => {
     const newRecordRef = push(ref(db, 'payments'));
-    await set(newRecordRef, { ...record, id: newRecordRef.key });
+    const id = newRecordRef.key as string;
+    await set(newRecordRef, { ...record, id });
+    return id;
+  },
+
+  deletePayment: async (id: string) => {
+    await remove(ref(db, `payments/${id}`));
   },
 
   // Auth / OTP (Transient Storage)

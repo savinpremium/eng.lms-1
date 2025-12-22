@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { storageService } from '../services/storageService';
 import { Student } from '../types';
-import { Search, CreditCard, ChevronLeft, MapPin, ScanQrCode, X, ShieldCheck } from 'lucide-react';
+import { Search, CreditCard, ChevronLeft, ScanQrCode, X, ShieldCheck } from 'lucide-react';
 import { audioService } from '../services/audioService';
 
 const StudentPortal: React.FC<{ onBack: () => void }> = ({ onBack }) => {
@@ -148,14 +148,14 @@ const StudentPortal: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             </div>
             <h2 className="text-5xl font-black tracking-tighter mb-2 italic uppercase">{student.name}</h2>
             <div className="flex items-center gap-4 mb-10">
-               <span className="text-blue-600 font-black tracking-[0.5em] uppercase text-xs">${student.id}</span>
+               <span className="text-blue-600 font-black tracking-[0.5em] uppercase text-xs">{student.id}</span>
                <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.3)]"></div>
             </div>
             
             <div className="grid grid-cols-2 gap-6 w-full">
               <div className="bg-slate-50 p-8 rounded-[2.8rem] border border-slate-100 shadow-sm">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-2">Grade / Level</p>
-                <p className="text-2xl font-black tracking-tighter">${student.grade}</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-2">Academic Grade</p>
+                <p className="text-2xl font-black tracking-tighter">{student.grade}</p>
               </div>
               <div className="bg-slate-50 p-8 rounded-[2.8rem] border border-slate-100 shadow-sm">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-2">Auth Status</p>
@@ -172,8 +172,8 @@ const StudentPortal: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
             <div className="p-10 bg-slate-950 rounded-[3.5rem] border border-slate-800 flex flex-col md:flex-row justify-between items-center gap-6 shadow-inner">
               <div className="text-center md:text-left">
-                <p className="font-black text-2xl tracking-tighter uppercase">Academic Installment</p>
-                <p className="text-slate-500 text-sm font-bold uppercase tracking-[0.2em] mt-1">Due Cycle: ${student.lastPaymentMonth}</p>
+                <p className="font-black text-2xl tracking-tighter uppercase">Tuition Fee</p>
+                <p className="text-slate-500 text-sm font-bold uppercase tracking-[0.2em] mt-1">Due Cycle: {student.lastPaymentMonth}</p>
               </div>
               <div className="text-center md:text-right">
                 <p className="text-4xl font-black tracking-tighter italic">LKR 2,500</p>

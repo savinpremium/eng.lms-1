@@ -2,12 +2,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { storageService } from '../services/storageService';
 import { audioService } from '../services/audioService';
-import { ShieldCheck, AlertCircle, Scan, History, Camera, AlertTriangle, UserCheck } from 'lucide-react';
+import { ShieldCheck, AlertCircle, Scan, History, Camera, AlertTriangle, UserCheck, RotateCcw } from 'lucide-react';
 import { Student } from '../types';
 
 const AttendanceGate: React.FC = () => {
   const [status, setStatus] = useState<'IDLE' | 'SUCCESS' | 'ERROR'>('IDLE');
-  const [lastStudent, setLastStudent] = useState<string | null>(null);
+  const [lastStudent, setLastStudent] = useState<Student | null>(null);
+  const [lastEntryId, setLastEntryId] = useState<string | null>(null);
   const [recentRecords, setRecentRecords] = useState<Student[]>([]);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
@@ -102,13 +103,14 @@ const AttendanceGate: React.FC = () => {
         audioService.speak("Payment Overdue");
         setTimeout(() => setStatus('IDLE'), 4000);
       } else {
-        await storageService.addAttendance({
+        const entryId = await storageService.addAttendance({
           id: '',
           studentId,
           date: today,
           timestamp: Date.now()
         });
-        setLastStudent(student.name);
+        setLastStudent(student);
+        setLastEntryId(entryId);
         setRecentRecords(prev => [student, ...prev].slice(0, 5));
         setStatus('SUCCESS');
         audioService.playSuccess();
@@ -120,6 +122,16 @@ const AttendanceGate: React.FC = () => {
       audioService.playError();
       setTimeout(() => setStatus('IDLE'), 1500);
     }
+  };
+
+  const undoLastEntry = async () => {
+    if (!lastEntryId) return;
+    if (!confirm("Delete last attendance entry?")) return;
+    await storageService.deleteAttendance(lastEntryId);
+    setRecentRecords(prev => prev.slice(1));
+    setLastStudent(null);
+    setLastEntryId(null);
+    alert("Entry removed.");
   };
 
   return (
@@ -184,11 +196,18 @@ const AttendanceGate: React.FC = () => {
             </h3>
             {lastStudent ? (
               <div className="animate-in zoom-in duration-500">
-                <p className="text-5xl font-black tracking-tighter mb-3 text-white uppercase italic leading-none">{lastStudent}</p>
-                <div className="flex items-center gap-3 text-emerald-500 font-black text-xs uppercase tracking-[0.3em]">
+                <p className="text-5xl font-black tracking-tighter mb-3 text-white uppercase italic leading-none">{lastStudent.name}</p>
+                <div className="flex items-center gap-3 text-emerald-500 font-black text-xs uppercase tracking-[0.3em] mb-8">
                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
                    Personnel Authorization Confirmed
                 </div>
+                <button 
+                  onClick={undoLastEntry}
+                  className="flex items-center gap-2 bg-slate-800 text-rose-500 px-6 py-3 rounded-full font-black uppercase text-[10px] tracking-widest hover:bg-slate-750 transition-all border border-slate-700"
+                >
+                  <RotateCcw size={14} />
+                  Undo Last Entry
+                </button>
               </div>
             ) : (
               <div className="py-4">
@@ -207,9 +226,9 @@ const AttendanceGate: React.FC = () => {
                 <div key={i} className="flex justify-between items-center bg-slate-900/30 p-6 rounded-[2rem] border border-slate-800/30 hover:bg-slate-900/50 transition-all group">
                   <div className="text-left">
                     <span className="font-black text-slate-200 uppercase text-lg leading-none block">{r.name}</span>
-                    <span className="text-[9px] font-black text-blue-500 uppercase tracking-widest mt-1 block">${r.id}</span>
+                    <span className="text-[9px] font-black text-blue-500 uppercase tracking-widest mt-1 block">{r.id}</span>
                   </div>
-                  <span className="text-[9px] bg-slate-800 text-slate-400 group-hover:bg-blue-600 group-hover:text-white px-4 py-2 rounded-full font-black tracking-widest uppercase transition-all">${r.grade}</span>
+                  <span className="text-[9px] bg-slate-800 text-slate-400 group-hover:bg-blue-600 group-hover:text-white px-4 py-2 rounded-full font-black tracking-widest uppercase transition-all">{r.grade}</span>
                 </div>
               )) : (
                 <div className="py-8 text-center opacity-20">

@@ -40,10 +40,17 @@ const PaymentDesk: React.FC = () => {
         const Html5Qrcode = (window as any).Html5Qrcode;
         if (!Html5Qrcode) return;
 
+        if (scannerRef.current) {
+          try {
+            if (scannerRef.current.isScanning) await scannerRef.current.stop();
+            scannerRef.current.clear();
+          } catch (e) {}
+        }
+
         scannerRef.current = new Html5Qrcode("qr-reader-payment");
         await scannerRef.current.start(
           { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 250, height: 250 } },
+          { fps: 15, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
           (decodedText: string) => {
             const student = students.find(s => s.id.toUpperCase() === decodedText.trim().toUpperCase());
             if (student) {
@@ -54,17 +61,28 @@ const PaymentDesk: React.FC = () => {
           },
           () => {} // silent search errors
         );
-      } catch (e) {
+      } catch (e: any) {
         console.error("Scanner Error:", e);
-        alert("Scanner Error: Camera access required for optical scanning.");
+        if (e.name === 'NotAllowedError') {
+          alert("Camera Permission Denied. Please enable camera access in your browser settings.");
+        } else {
+          alert("Scanner Error: Camera access required for optical scanning.");
+        }
         setIsScanning(false);
       }
-    }, 100);
+    }, 200);
   };
 
   const stopScanner = async () => {
-    if (scannerRef.current && scannerRef.current.isScanning) {
-      await scannerRef.current.stop();
+    if (scannerRef.current) {
+      try {
+        if (scannerRef.current.isScanning) {
+          await scannerRef.current.stop();
+        }
+        scannerRef.current.clear();
+      } catch (e) {
+        console.error("Stop scanner error", e);
+      }
     }
     setIsScanning(false);
   };
@@ -293,7 +311,7 @@ const PaymentDesk: React.FC = () => {
             <button onClick={stopScanner} className="absolute top-6 right-6 text-slate-500 hover:text-white transition-all"><X size={32}/></button>
             <h3 className="text-2xl font-black uppercase italic mb-8">Pass Key Scanner</h3>
             <div className="relative rounded-3xl overflow-hidden bg-black aspect-video border-4 border-slate-800 min-h-[300px]">
-              <div id="qr-reader-payment" className="w-full h-full"></div>
+              <div id="qr-reader-payment" className="w-full h-full overflow-hidden"></div>
             </div>
             <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500 mt-6 text-center">Align Student QR with frame</p>
           </div>

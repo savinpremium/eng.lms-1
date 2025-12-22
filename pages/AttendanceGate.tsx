@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { storageService } from '../services/storageService';
 import { audioService } from '../services/audioService';
-import { UserCheck, History, RotateCcw, Loader2, ScanQrCode, AlertTriangle, Check, X, Zap } from 'lucide-react';
+import { UserCheck, History, RotateCcw, Loader2, ScanQrCode, AlertTriangle, Check, X, Zap, Camera } from 'lucide-react';
 import { Student } from '../types';
 
 const AttendanceGate: React.FC = () => {
@@ -14,6 +14,7 @@ const AttendanceGate: React.FC = () => {
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isScannerActive, setIsScannerActive] = useState(false);
+  const [needsManualStart, setNeedsManualStart] = useState(false);
 
   const scannerRef = useRef<any>(null);
   const statusRef = useRef(status);
@@ -33,21 +34,34 @@ const AttendanceGate: React.FC = () => {
   const startScanner = async () => {
     if (!isDataLoaded) return;
     setCameraError(null);
+    setNeedsManualStart(false);
 
     try {
-      // Use Html5Qrcode from global scope
       const Html5Qrcode = (window as any).Html5Qrcode;
       if (!Html5Qrcode) {
         setCameraError("Scanner library not loaded.");
         return;
       }
 
+      // Ensure any previous scanner is stopped and cleared
+      if (scannerRef.current) {
+        try {
+          if (scannerRef.current.isScanning) {
+            await scannerRef.current.stop();
+          }
+          scannerRef.current.clear();
+        } catch (e) {
+          console.warn("Cleanup error", e);
+        }
+      }
+
       scannerRef.current = new Html5Qrcode("qr-reader-attendance");
       
       const config = { 
-        fps: 10, 
-        qrbox: { width: 300, height: 300 },
-        aspectRatio: 1.0
+        fps: 15, 
+        qrbox: { width: 280, height: 280 },
+        aspectRatio: 1.0,
+        disableFlip: false
       };
 
       await scannerRef.current.start(
@@ -59,32 +73,53 @@ const AttendanceGate: React.FC = () => {
           }
         },
         (errorMessage: string) => {
-          // Normal behavior: silent while searching
+          // Normal feedback loop during scan
         }
       );
       
       setIsScannerActive(true);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Scanner Error:", err);
-      setCameraError("Camera permission denied or camera not found.");
+      // Mobile browsers often block camera auto-start. 
+      // We show a manual button to trigger the permission prompt via user gesture.
+      setNeedsManualStart(true);
+      if (err.name === 'NotAllowedError' || err.toString().includes('Permission denied')) {
+        setCameraError("Permission Denied. Please allow camera access in browser settings.");
+      } else {
+        setCameraError("Camera unavailable or busy. Please retry.");
+      }
     }
   };
 
   const stopScanner = async () => {
-    if (scannerRef.current && scannerRef.current.isScanning) {
-      await scannerRef.current.stop();
+    if (scannerRef.current) {
+      try {
+        if (scannerRef.current.isScanning) {
+          await scannerRef.current.stop();
+        }
+        scannerRef.current.clear();
+      } catch (e) {
+        console.error("Stop scanner error", e);
+      }
       setIsScannerActive(false);
     }
   };
 
   useEffect(() => {
     if (isDataLoaded) {
-      startScanner();
+      // Small delay to ensure the DOM element is fully painted before starting
+      const timer = setTimeout(() => {
+        startScanner();
+      }, 500);
+      return () => clearTimeout(timer);
     }
+  }, [isDataLoaded]);
+
+  useEffect(() => {
     return () => {
       stopScanner();
     };
-  }, [isDataLoaded]);
+  }, []);
 
   const handleScan = async (studentId: string) => {
     if (statusRef.current !== 'IDLE') return;
@@ -171,23 +206,30 @@ const AttendanceGate: React.FC = () => {
           status === 'ERROR' ? 'border-rose-500 shadow-rose-500/20' : 
           'border-slate-800'
         }`}>
-          {cameraError ? (
-            <div className="p-12">
-              <AlertTriangle size={48} className="text-rose-500 mx-auto mb-6" />
-              <p className="text-white font-black uppercase text-sm tracking-widest mb-4">{cameraError}</p>
+          {needsManualStart ? (
+            <div className="p-12 animate-in zoom-in duration-500">
+              <Camera size={64} className="text-blue-500 mx-auto mb-8 opacity-50" />
+              <h3 className="text-white font-black uppercase text-xl tracking-tight mb-2 italic">Camera Gesture Required</h3>
+              <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest mb-10 max-w-xs mx-auto leading-relaxed">
+                Mobile browsers require a manual click to activate optical sensors.
+              </p>
               <button 
                 onClick={startScanner}
-                className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-full font-black uppercase text-[10px] tracking-widest transition-all"
+                className="bg-blue-600 hover:bg-blue-500 text-white px-10 py-5 rounded-[2rem] font-black uppercase text-xs tracking-[0.2em] transition-all shadow-2xl shadow-blue-600/20 flex items-center gap-4 mx-auto"
               >
-                Retry Camera
+                <ScanQrCode size={20} />
+                Activate Lens
               </button>
+              {cameraError && (
+                <p className="mt-8 text-rose-500 font-black uppercase text-[9px] tracking-[0.3em]">{cameraError}</p>
+              )}
             </div>
           ) : (
             <div className="relative w-full h-[550px] bg-black">
               {/* HTML5 QR Code Mount point */}
-              <div id="qr-reader-attendance" className="w-full h-full"></div>
+              <div id="qr-reader-attendance" className="w-full h-full overflow-hidden"></div>
 
-              {!isScannerActive && (
+              {!isScannerActive && !needsManualStart && (
                 <div className="absolute inset-0 bg-slate-900 flex flex-col items-center justify-center gap-4 z-10">
                   <Loader2 className="animate-spin text-blue-500" size={48} />
                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Initializing Optical Input...</p>

@@ -12,6 +12,15 @@ export interface Student {
   contact: string;
   lastPaymentMonth: string; // YYYY-MM
   registrationDate: string;
+  classGroupId?: string;
+}
+
+export interface ClassGroup {
+  id: string;
+  name: string;
+  grade: Grade;
+  waLink: string;
+  description: string;
 }
 
 export interface AttendanceRecord {
@@ -87,5 +96,6 @@ export enum Page {
   EXAMS = 'EXAMS',
   MATERIALS = 'MATERIALS',
   COMM_HUB = 'COMM_HUB',
-  SCHEDULE = 'SCHEDULE'
+  SCHEDULE = 'SCHEDULE',
+  GROUPS = 'GROUPS'
 }

@@ -1,10 +1,10 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Page, Grade, Student } from '../types';
 import { storageService } from '../services/storageService';
 import { audioService } from '../services/audioService';
 import { toPng } from 'html-to-image';
-import { CheckCircle, ArrowRight, ShieldCheck, QrCode, Lock, Printer, UserCheck, Loader2, X, Download, MessageSquare } from 'lucide-react';
+import { CheckCircle, ArrowRight, ShieldCheck, QrCode, Lock, Printer, UserCheck, Loader2, X, Download, MessageSquare, BookOpen } from 'lucide-react';
 
 interface LandingPageProps {
   onNavigate: (page: Page) => void;
@@ -20,10 +20,23 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, onLoginSuccess })
   });
   const [registeredStudent, setRegisteredStudent] = useState<Student | null>(null);
   const [showLogin, setShowLogin] = useState(false);
+  const [showManual, setShowManual] = useState(false);
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const manualSeen = localStorage.getItem('englms_manual_seen');
+    if (!manualSeen && !registeredStudent) {
+      setShowManual(true);
+    }
+  }, [registeredStudent]);
+
+  const closeManual = () => {
+    setShowManual(false);
+    localStorage.setItem('englms_manual_seen', 'true');
+  };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -226,6 +239,66 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, onLoginSuccess })
           )}
         </div>
       </div>
+
+      {/* Manual Modal (Sinhala Only - Formal & Humanized) */}
+      {showManual && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-6 backdrop-blur-3xl bg-slate-950/90 animate-in fade-in duration-500 overflow-y-auto"
+          onClick={closeManual} // Close on backdrop click
+        >
+          <div 
+            className="bg-slate-900 w-full max-w-lg p-6 md:p-10 rounded-3xl md:rounded-[4rem] border border-slate-800 shadow-3xl space-y-6 md:space-y-8 animate-in zoom-in duration-300 relative overflow-hidden my-auto max-h-[90vh] overflow-y-auto scrollbar-hide"
+            onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside
+          >
+            <div className="absolute top-0 right-0 p-6 md:p-10 opacity-5 pointer-events-none">
+              <BookOpen size={160} />
+            </div>
+            
+            <button 
+              onClick={closeManual}
+              className="absolute top-4 right-4 md:top-8 md:right-8 text-slate-500 hover:text-white transition-all z-10 p-2"
+            >
+              <X size={32} />
+            </button>
+
+            <div className="text-center pt-4">
+              <div className="w-14 h-14 md:w-16 md:h-16 bg-blue-600/10 text-blue-500 rounded-2xl md:rounded-3xl flex items-center justify-center mx-auto mb-4 md:mb-6 shadow-inner">
+                <BookOpen size={32} />
+              </div>
+              <h4 className="text-2xl md:text-3xl font-black tracking-tighter uppercase italic text-white mb-2 leading-tight">නව ශිෂ්‍ය ලියාපදිංචි වීමේ උපදෙස්</h4>
+              <p className="text-slate-500 font-bold uppercase text-[8px] md:text-[9px] tracking-widest leading-relaxed">පහත දැක්වෙන පියවරයන් අනුපිළිවෙලින් අනුගමනය කරන්න</p>
+            </div>
+
+            <div className="space-y-4 md:space-y-6 relative z-10">
+              {[
+                { step: '01', text: 'ඔබගේ සම්පූර්ණ නම ඉංග්‍රීසි අකුරින් පළමු කොටුවේ සටහන් කරන්න.' },
+                { step: '02', text: 'ඔබ ඉගෙන ගන්නා ශ්‍රේණිය තෝරා ඔබගේ ක්‍රියාකාරී වට්සැප් (WhatsApp) අංකය ඇතුළත් කරන්න.' },
+                { step: '03', text: 'ඔබගේ මව්පියන්ගේ හෝ භාරකරුගේ නම සඳහන් කරන්න.' },
+                { step: '04', text: 'සියලු තොරතුරු සම්පූර්ණ කිරීමෙන් පසු \'PROCEED ENROLLMENT\' බොත්තම ඔබන්න.' },
+                { step: '05', text: 'ලැබෙන ඔබගේ අනන්‍ය ශිෂ්‍ය අංකය සහ හැඳුනුම්පත අනාගත කටයුතු සඳහා සුරැකිව තබාගන්න.' }
+              ].map((item, idx) => (
+                <div key={idx} className="flex gap-4 md:gap-6 items-start group">
+                  <span className="text-xl md:text-2xl font-black text-blue-600 italic group-hover:scale-110 transition-transform flex-shrink-0">{item.step}</span>
+                  <p className="text-xs md:text-sm font-bold text-slate-300 leading-relaxed">{item.text}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="p-4 md:p-6 bg-blue-600/5 rounded-2xl md:rounded-3xl border border-blue-600/10">
+              <p className="text-center text-[9px] md:text-[10px] font-bold text-slate-400 leading-relaxed uppercase tracking-wider">
+                මෙම ඩිජිටල් පද්ධතිය හරහා ඔබගේ පැමිණීම සහ ගාස්තු ගෙවීම් ඉතා පහසුවෙන් කළමනාකරණය කරනු ලැබේ.
+              </p>
+            </div>
+
+            <button 
+              onClick={closeManual}
+              className="w-full bg-blue-600 hover:bg-blue-500 text-white py-4 md:py-5 rounded-xl md:rounded-2xl font-black uppercase tracking-tighter text-base md:text-lg shadow-xl shadow-blue-600/20 transition-all transform hover:scale-[1.02] active:scale-95"
+            >
+              මා හට උපදෙස් අවබෝධ විය
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Login Modal */}
       {showLogin && (

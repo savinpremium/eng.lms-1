@@ -14,7 +14,8 @@ import {
   GraduationCap,
   LibraryBig,
   CalendarDays,
-  History
+  History,
+  Layers
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -25,17 +26,18 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate, onLogout }) => {
   const menuItems = [
-    { page: Page.DASHBOARD, icon: LayoutDashboard, label: 'Ethics Monitor' },
-    { page: Page.STUDENTS, icon: Users, label: 'Student IDs' },
+    { page: Page.DASHBOARD, icon: LayoutDashboard, label: 'Monitor Station' },
+    { page: Page.GROUPS, icon: Layers, label: 'Class Batches' },
+    { page: Page.STUDENTS, icon: Users, label: 'Student Registry' },
     { page: Page.ENROLLMENT, icon: UserPlus, label: 'Enrollment' },
     { page: Page.ATTENDANCE, icon: ScanQrCode, label: 'QR Gate' },
-    { page: Page.CLASS_ATTENDANCE, icon: BookOpenCheck, label: 'Class Register' },
-    { page: Page.SCHEDULE, icon: CalendarDays, label: 'Schedule' },
-    { page: Page.EXAMS, icon: GraduationCap, label: 'Assessment' },
+    { page: Page.CLASS_ATTENDANCE, icon: BookOpenCheck, label: 'Session Log' },
+    { page: Page.SCHEDULE, icon: CalendarDays, label: 'Timetable' },
+    { page: Page.EXAMS, icon: GraduationCap, label: 'Assessments' },
     { page: Page.MATERIALS, icon: LibraryBig, label: 'Study Hub' },
-    { page: Page.PAYMENTS, icon: CreditCard, label: 'Payments' },
-    { page: Page.MESSENGER, icon: MessageSquare, label: 'AI Messenger' },
-    { page: Page.COMM_HUB, icon: History, label: 'Comm Audit' },
+    { page: Page.PAYMENTS, icon: CreditCard, label: 'Payment Desk' },
+    { page: Page.MESSENGER, icon: MessageSquare, label: 'Human Messenger' },
+    { page: Page.COMM_HUB, icon: History, label: 'Audit Log' },
   ];
 
   return (

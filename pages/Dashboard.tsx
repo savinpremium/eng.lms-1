@@ -11,7 +11,7 @@ import {
   ResponsiveContainer, 
   Cell 
 } from 'recharts';
-import { Users, Calendar, ShieldEllipsis, MessageSquare, Loader2, GraduationCap, LibraryBig, ScanQrCode, CreditCard, ArrowUpRight } from 'lucide-react';
+import { Users, Calendar, ShieldEllipsis, MessageSquare, Loader2, GraduationCap, LibraryBig, ScanQrCode, CreditCard, ArrowRight, AlertCircle } from 'lucide-react';
 import { Student, AttendanceRecord, PaymentRecord, Grade, ResultRecord, MaterialRecord, Page } from '../types';
 
 interface DashboardProps {
@@ -50,13 +50,12 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const stats = useMemo(() => {
     const today = new Date().toISOString().split('T')[0];
     const todayAttendance = attendance.filter(a => a.date === today).length;
-    const pendingCount = students.filter(s => s.lastPaymentMonth < today.slice(0, 7)).length;
 
     return [
-      { label: 'Academic Force', value: students.length, icon: Users, color: 'text-blue-500' },
-      { label: 'Gate entries (Today)', value: todayAttendance, icon: Calendar, color: 'text-emerald-500' },
-      { label: 'Assessments Logged', value: results.length, icon: GraduationCap, color: 'text-purple-500' },
-      { label: 'Study Hub Assets', value: materials.length, icon: LibraryBig, color: 'text-amber-500' },
+      { label: 'Total Students', value: students.length, icon: Users, color: 'text-blue-500' },
+      { label: 'Attendance (Today)', value: todayAttendance, icon: Calendar, color: 'text-emerald-500' },
+      { label: 'Assessment Logs', value: results.length, icon: GraduationCap, color: 'text-purple-500' },
+      { label: 'Digital Assets', value: materials.length, icon: LibraryBig, color: 'text-amber-500' },
     ];
   }, [students, attendance, results, materials]);
 
@@ -79,10 +78,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     setTimeout(() => setOtp(null), 300000); 
   };
 
-  const sendReminder = async (student: Student) => {
+  const sendLateReminder = async (student: Student) => {
     setRemindingId(student.id);
     try {
-      const draft = await generateWhatsAppDraft(student, 'payment');
+      const draft = await generateWhatsAppDraft(student, 'payment_late');
       const phone = student.contact.replace(/\D/g, '');
       const waPhone = phone.startsWith('0') ? '94' + phone.substring(1) : phone;
       const encodedText = encodeURIComponent(draft);
@@ -99,17 +98,17 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8 animate-in fade-in slide-in-from-top-4 duration-500">
         <div>
           <h1 className="text-6xl font-black tracking-tighter uppercase italic leading-none text-white">Monitor Station</h1>
-          <p className="text-slate-500 font-bold uppercase text-[10px] tracking-[0.5em] mt-3">Vital Institutional Analytics & Security Console</p>
+          <p className="text-slate-500 font-bold uppercase text-[10px] tracking-[0.5em] mt-3">Welcome to Excellence English Hub</p>
         </div>
         
-        <div className="bg-slate-900 border-2 border-slate-800 p-8 rounded-[4rem] flex items-center gap-10 shadow-3xl shadow-blue-900/10">
+        <div className="bg-slate-900 border-2 border-slate-800 p-8 rounded-[4rem] flex items-center gap-10 shadow-3xl">
           <div>
             <p className="text-[10px] font-black tracking-[0.5em] uppercase text-slate-600 mb-2">Personnel OTP</p>
             <p className="text-4xl font-black tracking-[0.2em] italic text-blue-500">{otp || '----'}</p>
           </div>
           <button 
             onClick={handleGenerateOTP}
-            className="w-16 h-16 bg-blue-600 rounded-[1.8rem] flex items-center justify-center hover:bg-blue-500 transition-all shadow-xl shadow-blue-600/20 active:scale-95"
+            className="w-16 h-16 bg-blue-600 rounded-[1.8rem] flex items-center justify-center hover:bg-blue-500 transition-all shadow-xl active:scale-95"
             title="Generate Secure Access Key"
           >
             <ShieldEllipsis size={32} className="text-white" />
@@ -117,35 +116,37 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         </div>
       </header>
 
-      {/* QUICK LAUNCH TERMINAL */}
-      <section className="animate-in fade-in slide-in-from-bottom-8 duration-700">
-        <h3 className="text-[10px] font-black tracking-[0.5em] uppercase text-slate-600 mb-8 flex items-center gap-3 italic">
-          <ArrowUpRight size={18} className="text-blue-500" />
-          Quick Launch Terminal
-        </h3>
+      <section className="bg-slate-900/20 p-10 md:p-14 rounded-[5.5rem] border border-slate-800/50 animate-in fade-in slide-in-from-bottom-8 duration-700">
+        <div className="flex items-center gap-4 mb-10">
+          <div className="w-12 h-12 bg-blue-600/10 text-blue-500 rounded-2xl flex items-center justify-center">
+            <ScanQrCode size={24} />
+          </div>
+          <h3 className="text-2xl font-black uppercase italic tracking-tighter text-white">Institutional Terminals</h3>
+        </div>
+        
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <button 
             onClick={() => onNavigate(Page.ATTENDANCE)}
-            className="group relative bg-emerald-600 p-12 rounded-[4.5rem] flex items-center justify-between overflow-hidden shadow-2xl shadow-emerald-900/20 hover:scale-[1.02] transition-all border-4 border-emerald-500/50"
+            className="group relative bg-emerald-600 p-12 rounded-[4rem] flex items-center justify-between overflow-hidden shadow-2xl hover:scale-[1.02] transition-all border-4 border-emerald-500/50"
           >
             <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-white/5 rounded-full group-hover:scale-125 transition-transform duration-1000"></div>
             <div className="relative z-10 text-left">
-              <p className="text-5xl font-black tracking-tighter uppercase italic text-white leading-none mb-2">QR Gate</p>
-              <p className="text-[10px] font-black uppercase tracking-widest text-emerald-100/60">Activate Attendance Scanner</p>
+              <p className="text-4xl font-black tracking-tighter uppercase italic text-white leading-none mb-2">QR Gate</p>
+              <p className="text-[9px] font-black uppercase tracking-widest text-emerald-100/60">Mark Attendance</p>
             </div>
-            <ScanQrCode size={64} className="text-white relative z-10 group-hover:rotate-12 transition-transform" />
+            <ArrowRight size={48} className="text-white relative z-10 group-hover:translate-x-3 transition-transform" />
           </button>
 
           <button 
             onClick={() => onNavigate(Page.PAYMENTS)}
-            className="group relative bg-blue-700 p-12 rounded-[4.5rem] flex items-center justify-between overflow-hidden shadow-2xl shadow-blue-900/20 hover:scale-[1.02] transition-all border-4 border-blue-600/50"
+            className="group relative bg-blue-700 p-12 rounded-[4rem] flex items-center justify-between overflow-hidden shadow-2xl hover:scale-[1.02] transition-all border-4 border-blue-600/50"
           >
             <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-white/5 rounded-full group-hover:scale-125 transition-transform duration-1000"></div>
             <div className="relative z-10 text-left">
-              <p className="text-5xl font-black tracking-tighter uppercase italic text-white leading-none mb-2">Payments</p>
-              <p className="text-[10px] font-black uppercase tracking-widest text-blue-100/60">Launch Financial Ledger</p>
+              <p className="text-4xl font-black tracking-tighter uppercase italic text-white leading-none mb-2">Class Fees</p>
+              <p className="text-[9px] font-black uppercase tracking-widest text-blue-100/60">Settle Monthly Dues</p>
             </div>
-            <CreditCard size={64} className="text-white relative z-10 group-hover:-translate-y-2 transition-transform" />
+            <ArrowRight size={48} className="text-white relative z-10 group-hover:translate-x-3 transition-transform" />
           </button>
         </div>
       </section>
@@ -164,7 +165,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 bg-slate-900/30 border-2 border-slate-800 p-12 rounded-[5.5rem] shadow-3xl animate-in fade-in slide-in-from-bottom-8 duration-700 delay-200">
-          <h3 className="text-3xl font-black mb-12 tracking-tight uppercase italic leading-none text-white text-center md:text-left">Class Distribution</h3>
+          <h3 className="text-3xl font-black mb-12 tracking-tight uppercase italic leading-none text-white text-center md:text-left">Student Distribution</h3>
           <div className="h-[400px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} margin={{ top: 20, right: 20, left: 0, bottom: 20 }}>
@@ -199,9 +200,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         <div className="bg-slate-900/50 border-2 border-slate-800 p-10 rounded-[4rem] shadow-3xl animate-in slide-in-from-right-8 duration-700">
           <div className="flex items-center gap-4 mb-10">
             <div className="w-12 h-12 bg-rose-500/10 text-rose-500 rounded-2xl flex items-center justify-center shadow-inner">
-              <MessageSquare size={24} />
+              <AlertCircle size={24} />
             </div>
-            <h3 className="text-2xl font-black uppercase italic tracking-tighter text-white">Payment Alerts</h3>
+            <h3 className="text-2xl font-black uppercase italic tracking-tighter text-white">Fee Reminders</h3>
           </div>
 
           <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
@@ -210,13 +211,13 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                 <div className="flex justify-between items-start mb-4">
                   <div>
                     <p className="font-black text-sm uppercase tracking-tight text-slate-200">{s.name}</p>
-                    <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest mt-0.5">Last Settled: {s.lastPaymentMonth}</p>
+                    <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest mt-0.5">Last Fee Paid: {s.lastPaymentMonth}</p>
                   </div>
                   <button 
-                    onClick={() => sendReminder(s)}
+                    onClick={() => sendLateReminder(s)}
                     disabled={remindingId === s.id}
-                    className="w-10 h-10 bg-blue-600/10 text-blue-500 rounded-xl flex items-center justify-center hover:bg-blue-600 hover:text-white transition-all shadow-inner"
-                    title="Send WhatsApp Reminder"
+                    className="w-10 h-10 bg-rose-600/10 text-rose-500 rounded-xl flex items-center justify-center hover:bg-rose-600 hover:text-white transition-all shadow-inner"
+                    title="Send Gentle Reminder"
                   >
                     {remindingId === s.id ? <Loader2 size={16} className="animate-spin" /> : <MessageSquare size={16} />}
                   </button>
@@ -228,11 +229,14 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             ))}
             {pendingStudents.length === 0 && (
               <div className="py-20 text-center opacity-20">
-                <p className="font-black uppercase tracking-[0.5em] text-xs">All accounts settled</p>
+                <p className="font-black uppercase tracking-[0.5em] text-xs">All Fees Current</p>
               </div>
             )}
-            <button className="w-full mt-6 py-4 bg-slate-900 border border-slate-800 rounded-2xl text-[10px] font-black uppercase tracking-[0.4em] text-slate-500 hover:text-white transition-all">
-              Comprehensive Audit
+            <button 
+              onClick={() => onNavigate(Page.COMM_HUB)}
+              className="w-full mt-6 py-4 bg-slate-900 border border-slate-800 rounded-2xl text-[10px] font-black uppercase tracking-[0.4em] text-slate-500 hover:text-white transition-all"
+            >
+              Communication Log
             </button>
           </div>
         </div>

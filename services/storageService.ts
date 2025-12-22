@@ -1,7 +1,7 @@
 
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, set, get, push, update, onValue, child, remove } from "firebase/database";
-import { Student, AttendanceRecord, PaymentRecord, ResultRecord, MaterialRecord, MessageLog, ScheduleRecord } from '../types';
+import { Student, AttendanceRecord, PaymentRecord, ResultRecord, MaterialRecord, MessageLog, ScheduleRecord, ClassGroup } from '../types';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDneDiUzFALG_DcH1gNJmzB0WIddQcDxsA",
@@ -24,6 +24,28 @@ export const storageService = {
     return onValue(connectedRef, (snap) => {
       callback(snap.val() === true);
     });
+  },
+
+  // Class Groups
+  listenClasses: (callback: (classes: ClassGroup[]) => void) => {
+    const classRef = ref(db, 'classes');
+    return onValue(classRef, (snapshot) => {
+      if (snapshot.exists()) {
+        callback(Object.values(snapshot.val()));
+      } else {
+        callback([]);
+      }
+    });
+  },
+
+  saveClass: async (cls: ClassGroup) => {
+    const classRef = cls.id ? ref(db, `classes/${cls.id}`) : push(ref(db, 'classes'));
+    const id = cls.id || classRef.key as string;
+    await set(ref(db, `classes/${id}`), { ...cls, id });
+  },
+
+  deleteClass: async (id: string) => {
+    await remove(ref(db, `classes/${id}`));
   },
 
   // Students

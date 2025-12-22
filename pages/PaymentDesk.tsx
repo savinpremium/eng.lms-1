@@ -5,7 +5,7 @@ import { audioService } from '../services/audioService';
 import { generateWhatsAppDraft } from '../services/geminiService';
 import { Student, PaymentRecord } from '../types';
 import { toPng } from 'html-to-image';
-import { Search, Printer, CreditCard, ChevronRight, User, Hash, X, CheckCircle, Loader2, Sparkles, Zap, ScanQrCode, Camera } from 'lucide-react';
+import { Search, Printer, CreditCard, ChevronRight, User, Hash, X, CheckCircle, Loader2, Sparkles, Zap, ScanQrCode, Camera, Image as ImageIcon, ShieldAlert } from 'lucide-react';
 
 const PaymentDesk: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -18,8 +18,10 @@ const PaymentDesk: React.FC = () => {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
   const [isScannerActive, setIsScannerActive] = useState(false);
+  const [isDecodingFile, setIsDecodingFile] = useState(false);
 
   const scannerRef = useRef<any>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     return storageService.listenStudents(setStudents);
@@ -66,16 +68,40 @@ const PaymentDesk: React.FC = () => {
       setIsScannerActive(true);
     } catch (e: any) {
       console.error("Scanner Error:", e);
-      alert("Scanner Failure: " + (e.name === 'NotAllowedError' ? "Permission Denied" : "Check if your site is using HTTPS."));
+      alert("Live stream failed. Please use the 'Capture Photo' method instead if you are not using HTTPS.");
+    }
+  };
+
+  const handleFileScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsDecodingFile(true);
+    try {
+      const Html5Qrcode = (window as any).Html5Qrcode;
+      const html5QrCode = new Html5Qrcode("qr-reader-payment", false);
+      const decodedText = await html5QrCode.scanFile(file, true);
+      const student = students.find(s => s.id.toUpperCase() === decodedText.trim().toUpperCase());
+      if (student) {
+        setSelectedStudent(student);
+        audioService.playSuccess();
+        closeScanner();
+      } else {
+        alert("Student ID decoded (" + decodedText + ") but not found in registry.");
+      }
+    } catch (err) {
+      console.error("File Scan Error:", err);
+      alert("Could not find a valid QR code in that photo.");
+    } finally {
+      setIsDecodingFile(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
   const closeScanner = async () => {
     if (scannerRef.current) {
       try {
-        if (scannerRef.current.isScanning) {
-          await scannerRef.current.stop();
-        }
+        if (scannerRef.current.isScanning) await scannerRef.current.stop();
         scannerRef.current.clear();
       } catch (e) {}
     }
@@ -309,15 +335,46 @@ const PaymentDesk: React.FC = () => {
             
             <div className="relative rounded-3xl overflow-hidden bg-black aspect-video border-4 border-slate-800 min-h-[300px] flex items-center justify-center">
               {!isScannerActive ? (
-                <div className="text-center p-8">
-                   <Camera size={48} className="text-blue-500 mx-auto mb-4 opacity-50" />
-                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-6">Permission Check Required</p>
-                   <button 
-                    onClick={startScanner}
-                    className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all shadow-xl"
-                   >
-                    Enable Lens
-                   </button>
+                <div className="text-center p-8 space-y-6">
+                   <Camera size={48} className="text-blue-500 mx-auto mb-2 opacity-50" />
+                   <div className="space-y-2">
+                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Method Selection</p>
+                     {!window.isSecureContext && (
+                        <div className="flex items-center gap-2 justify-center text-amber-500">
+                          <ShieldAlert size={12} />
+                          <span className="text-[8px] font-black uppercase tracking-widest">HTTP Mode: Use Capture Photo</span>
+                        </div>
+                     )}
+                   </div>
+                   
+                   <div className="flex flex-col gap-3 w-full max-w-xs mx-auto">
+                     <button 
+                      onClick={startScanner}
+                      className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all shadow-xl flex items-center justify-center gap-3"
+                     >
+                      <ScanQrCode size={16} />
+                      Live Stream
+                     </button>
+                     
+                     <div className="relative">
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          capture="environment" 
+                          ref={fileInputRef}
+                          onChange={handleFileScan}
+                          className="hidden" 
+                        />
+                        <button 
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={isDecodingFile}
+                          className="w-full bg-slate-800 hover:bg-slate-750 text-slate-300 px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all flex items-center justify-center gap-3 border border-slate-700"
+                        >
+                          {isDecodingFile ? <Loader2 className="animate-spin" size={16} /> : <ImageIcon size={16} />}
+                          {isDecodingFile ? 'Decoding...' : 'Capture Photo'}
+                        </button>
+                      </div>
+                   </div>
                 </div>
               ) : (
                 <div id="qr-reader-payment" className="w-full h-full overflow-hidden"></div>

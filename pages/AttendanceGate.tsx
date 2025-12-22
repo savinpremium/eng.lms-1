@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { storageService } from '../services/storageService';
 import { audioService } from '../services/audioService';
-import { UserCheck, History, RotateCcw, Loader2, ScanQrCode, AlertTriangle, Check, X, Zap, Camera, ShieldAlert } from 'lucide-react';
+import { UserCheck, History, RotateCcw, Loader2, ScanQrCode, AlertTriangle, Check, X, Zap, Camera, ShieldAlert, Image as ImageIcon } from 'lucide-react';
 import { Student } from '../types';
 
 const AttendanceGate: React.FC = () => {
@@ -15,19 +15,23 @@ const AttendanceGate: React.FC = () => {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isScannerActive, setIsScannerActive] = useState(false);
   const [isSecure, setIsSecure] = useState(true);
+  const [isDecodingFile, setIsDecodingFile] = useState(false);
 
   const scannerRef = useRef<any>(null);
   const statusRef = useRef(status);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     statusRef.current = status;
   }, [status]);
 
   useEffect(() => {
-    // Check for Secure Context (Chrome requires HTTPS for Camera)
-    if (!window.isSecureContext && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-      setIsSecure(false);
-      setCameraError("Security Block: Camera access requires HTTPS/Secure connection.");
+    // Detect Secure Context - Chrome blocks camera on HTTP (except localhost)
+    const secure = window.isSecureContext || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    setIsSecure(!!secure);
+    
+    if (!secure) {
+      setCameraError("Chrome requires HTTPS for live camera scanning.");
     }
 
     const unsub = storageService.listenStudents((data) => {
@@ -50,13 +54,9 @@ const AttendanceGate: React.FC = () => {
 
       if (scannerRef.current) {
         try {
-          if (scannerRef.current.isScanning) {
-            await scannerRef.current.stop();
-          }
+          if (scannerRef.current.isScanning) await scannerRef.current.stop();
           scannerRef.current.clear();
-        } catch (e) {
-          console.warn("Cleanup error", e);
-        }
+        } catch (e) {}
       }
 
       scannerRef.current = new Html5Qrcode("qr-reader-attendance");
@@ -64,11 +64,9 @@ const AttendanceGate: React.FC = () => {
       const config = { 
         fps: 20, 
         qrbox: { width: 250, height: 250 },
-        aspectRatio: 1.0,
-        disableFlip: false
+        aspectRatio: 1.0
       };
 
-      // We use a manual start to satisfy "User Gesture" requirements in Chrome/Mobile
       await scannerRef.current.start(
         { facingMode: "environment" },
         config,
@@ -82,10 +80,11 @@ const AttendanceGate: React.FC = () => {
       setIsScannerActive(true);
     } catch (err: any) {
       console.error("Scanner Error:", err);
+      setIsScannerActive(false);
       if (err.name === 'NotAllowedError' || err.toString().includes('Permission denied')) {
-        setCameraError("Permission Denied. Please enable camera in your browser settings.");
+        setCameraError("Permission Denied. Please check browser settings.");
       } else {
-        setCameraError("Camera unavailable. This site might need HTTPS to use the camera.");
+        setCameraError("Camera unavailable. This is likely due to the site using HTTP instead of HTTPS.");
       }
     }
   };
@@ -93,22 +92,32 @@ const AttendanceGate: React.FC = () => {
   const stopScanner = async () => {
     if (scannerRef.current) {
       try {
-        if (scannerRef.current.isScanning) {
-          await scannerRef.current.stop();
-        }
+        if (scannerRef.current.isScanning) await scannerRef.current.stop();
         scannerRef.current.clear();
-      } catch (e) {
-        console.error("Stop scanner error", e);
-      }
+      } catch (e) {}
       setIsScannerActive(false);
     }
   };
 
-  useEffect(() => {
-    return () => {
-      stopScanner();
-    };
-  }, []);
+  const handleFileScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !isDataLoaded) return;
+
+    setIsDecodingFile(true);
+    try {
+      const Html5Qrcode = (window as any).Html5Qrcode;
+      const html5QrCode = new Html5Qrcode("qr-reader-attendance", false);
+      const decodedText = await html5QrCode.scanFile(file, true);
+      handleScan(decodedText);
+    } catch (err) {
+      console.error("File Scan Error:", err);
+      audioService.playError();
+      alert("Could not find a valid QR code in that photo. Please try again.");
+    } finally {
+      setIsDecodingFile(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   const handleScan = async (studentId: string) => {
     if (statusRef.current !== 'IDLE') return;
@@ -158,7 +167,6 @@ const AttendanceGate: React.FC = () => {
           setTimeout(() => setStatus('IDLE'), 3500);
         }
       } catch (e) {
-        console.error("Attendance log failed", e);
         setStatus('ERROR');
         setTimeout(() => setStatus('IDLE'), 2000);
       }
@@ -188,16 +196,6 @@ const AttendanceGate: React.FC = () => {
         </p>
       </header>
 
-      {!isSecure && (
-        <div className="bg-rose-500/10 border-2 border-rose-500 p-8 rounded-[3rem] text-center animate-in zoom-in duration-500">
-          <ShieldAlert size={48} className="text-rose-500 mx-auto mb-4" />
-          <h3 className="text-xl font-black uppercase text-white mb-2 italic">Connection Insecure</h3>
-          <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest max-w-md mx-auto">
-            Chrome restricts camera access to HTTPS connections. Please ensure you are accessing the site via a secure URL.
-          </p>
-        </div>
-      )}
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
         <div className={`relative rounded-[5rem] overflow-hidden border-8 transition-all duration-300 shadow-3xl bg-slate-900 min-h-[550px] flex flex-col items-center justify-center p-0 text-center ${
           status === 'SUCCESS' ? 'border-emerald-500 shadow-emerald-500/20' : 
@@ -206,30 +204,65 @@ const AttendanceGate: React.FC = () => {
           'border-slate-800'
         }`}>
           {!isScannerActive ? (
-            <div className="p-12 animate-in zoom-in duration-500">
-              <Camera size={64} className="text-blue-500 mx-auto mb-8 opacity-50" />
-              <h3 className="text-white font-black uppercase text-xl tracking-tight mb-2 italic">Sensor Activation</h3>
-              <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest mb-10 max-w-xs mx-auto leading-relaxed">
-                Click below to initialize optical sensors. This manual step is required for browser security.
-              </p>
-              <button 
-                onClick={startScanner}
-                disabled={!isSecure}
-                className="bg-blue-600 hover:bg-blue-500 disabled:opacity-30 disabled:grayscale text-white px-10 py-5 rounded-[2rem] font-black uppercase text-xs tracking-[0.2em] transition-all shadow-2xl shadow-blue-600/20 flex items-center gap-4 mx-auto"
-              >
-                <ScanQrCode size={20} />
-                Activate Gate
-              </button>
-              {cameraError && (
-                <p className="mt-8 text-rose-500 font-black uppercase text-[9px] tracking-[0.3em]">{cameraError}</p>
+            <div className="p-12 animate-in zoom-in duration-500 space-y-8">
+              <Camera size={64} className="text-blue-500 mx-auto mb-2 opacity-50" />
+              <div>
+                <h3 className="text-white font-black uppercase text-xl tracking-tight mb-2 italic">Optics Terminal</h3>
+                <p className="text-slate-500 font-bold uppercase text-[9px] tracking-widest max-w-xs mx-auto leading-relaxed">
+                  Choose a capture method below to verify student pass.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-4 w-full max-w-xs mx-auto">
+                <button 
+                  onClick={startScanner}
+                  className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-5 rounded-[2rem] font-black uppercase text-xs tracking-[0.2em] transition-all shadow-2xl shadow-blue-600/20 flex items-center justify-center gap-4"
+                >
+                  <ScanQrCode size={20} />
+                  Live Stream
+                </button>
+                
+                <div className="relative">
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    capture="environment" 
+                    ref={fileInputRef}
+                    onChange={handleFileScan}
+                    className="hidden" 
+                  />
+                  <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isDecodingFile}
+                    className="w-full bg-slate-800 hover:bg-slate-750 text-slate-300 px-8 py-5 rounded-[2rem] font-black uppercase text-xs tracking-[0.2em] transition-all flex items-center justify-center gap-4 border border-slate-700"
+                  >
+                    {isDecodingFile ? <Loader2 className="animate-spin" size={20} /> : <ImageIcon size={20} />}
+                    {isDecodingFile ? 'Decoding...' : 'Capture Photo'}
+                  </button>
+                </div>
+              </div>
+
+              {!isSecure && (
+                <div className="flex items-center gap-3 justify-center text-amber-500">
+                  <ShieldAlert size={14} />
+                  <p className="text-[9px] font-black uppercase tracking-widest">Insecure Context: Use "Capture Photo" instead</p>
+                </div>
+              )}
+              
+              {cameraError && !isSecure && (
+                <p className="text-rose-500 font-black uppercase text-[8px] tracking-[0.3em]">{cameraError}</p>
               )}
             </div>
           ) : (
             <div className="relative w-full h-[550px] bg-black">
-              {/* HTML5 QR Code Mount point */}
               <div id="qr-reader-attendance" className="w-full h-full overflow-hidden"></div>
-
-              {/* Status Overlays */}
+              <button 
+                onClick={stopScanner}
+                className="absolute top-6 right-6 z-30 bg-slate-950/80 p-4 rounded-2xl text-white hover:text-rose-500 transition-colors"
+              >
+                <X size={24} />
+              </button>
+              
               {status !== 'IDLE' && (
                 <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center animate-in fade-in zoom-in duration-300 z-20">
                   {status === 'PROCESSING' && <Loader2 className="animate-spin text-blue-500" size={80} />}
@@ -246,7 +279,7 @@ const AttendanceGate: React.FC = () => {
           <div className="bg-slate-900/50 p-12 rounded-[4rem] border border-slate-800 shadow-2xl relative overflow-hidden">
             <h3 className="text-[10px] font-black tracking-[0.5em] uppercase text-slate-600 mb-8 flex items-center gap-3">
               <UserCheck size={18} className="text-blue-500" />
-              Detected Student
+              Verified Entry
             </h3>
             {lastStudent ? (
               <div className="animate-in zoom-in duration-500">
@@ -262,7 +295,7 @@ const AttendanceGate: React.FC = () => {
               </div>
             ) : (
               <div className="py-4 opacity-20">
-                <p className="text-3xl font-black text-slate-400 uppercase italic leading-tight text-center">Awaiting <br /> QR Scan</p>
+                <p className="text-3xl font-black text-slate-400 uppercase italic leading-tight text-center">Awaiting <br /> QR Capture</p>
               </div>
             )}
           </div>

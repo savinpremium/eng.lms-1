@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { storageService } from '../services/storageService';
 import { audioService } from '../services/audioService';
 import { Student, Page } from '../types';
-// Added Loader2 to the lucide-react imports
 import { UserPlus, Search, Hash, Trash2, User, Printer, X, ShieldCheck, Loader2 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 
@@ -36,44 +35,64 @@ const StudentRegistry: React.FC<{ onNavigate: (page: Page) => void }> = ({ onNav
     const buffer = document.getElementById('render-buffer');
     if (!buffer) return;
 
+    // Redesigned template based on user-provided image
     buffer.innerHTML = `
-      <div id="pvc-card-target" style="width: 324px; height: 204px; background: #020617; color: white; border-radius: 12px; position: relative; overflow: hidden; padding: 15px; font-family: 'Inter', sans-serif;">
-        <div style="display: flex; gap: 12px; height: 100%;">
-          <div style="flex: 0 0 80px; display: flex; flex-direction: column; gap: 10px;">
-            <div style="width: 80px; height: 80px; background: #1e293b; border-radius: 8px; display: flex; items-center; justify-center;">
-               <span style="font-size: 10px; font-weight: 900; color: #334155;">PHOTO</span>
-            </div>
-            <div style="width: 80px; height: 80px; background: white; border-radius: 8px; padding: 4px;">
-               <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${student.id}" style="width: 100%; height: 100%;" />
-            </div>
+      <div id="pvc-card-target" style="width: 324px; height: 204px; background: white; color: white; border-radius: 16px; position: relative; overflow: hidden; font-family: 'Inter', sans-serif; display: flex;">
+        <!-- Left Side: QR & Pass Key -->
+        <div style="flex: 0 0 128px; background: white; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px;">
+          <div style="width: 100px; height: 100px; padding: 4px; background: white;">
+             <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${student.id}" style="width: 100%; height: 100%; image-rendering: pixelated;" />
           </div>
-          <div style="flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+          <div style="margin-top: 12px; background: #f1f5f9; color: #020617; padding: 6px 14px; border-radius: 6px; font-size: 10px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase;">
+            PASS KEY
+          </div>
+        </div>
+
+        <!-- Right Side: Details -->
+        <div style="flex: 1; background: #020617; padding: 20px; position: relative; display: flex; flex-direction: column; justify-content: space-between;">
+          <!-- Background Accent Circle -->
+          <div style="position: absolute; top: -40px; right: -40px; width: 140px; height: 140px; background: #1e293b; border-radius: 100%; opacity: 0.3; filter: blur(20px);"></div>
+          
+          <div style="position: relative; z-index: 10;">
+            <div style="font-size: 16px; font-weight: 900; color: #3b82f6; text-transform: uppercase; letter-spacing: -0.5px; line-height: 1;">EXCELLENCE</div>
+            <div style="font-size: 16px; font-weight: 900; color: #3b82f6; text-transform: uppercase; letter-spacing: -0.5px; line-height: 1;">ENGLISH</div>
+            <div style="font-size: 6px; font-weight: 900; color: #475569; text-transform: uppercase; letter-spacing: 2.5px; margin-top: 4px;">PROFESSIONAL NETWORK</div>
+          </div>
+
+          <div style="position: relative; z-index: 10; margin-top: 10px;">
+            <div style="font-size: 7px; font-weight: 900; color: #3b82f6; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">INSTITUTIONAL IDENTITY</div>
+            <div style="font-size: 20px; font-weight: 900; color: white; text-transform: uppercase; letter-spacing: -0.5px; line-height: 1;">${student.name}</div>
+            <div style="font-size: 14px; font-weight: 900; color: #3b82f6; letter-spacing: 1px; margin-top: 6px;">${student.id}</div>
+          </div>
+
+          <div style="position: relative; z-index: 10; display: flex; gap: 24px; margin-top: 10px;">
             <div>
-              <div style="font-size: 12px; font-weight: 900; color: #3b82f6; text-transform: uppercase; letter-spacing: 2px;">Excellence English</div>
-              <div style="font-size: 14px; font-weight: 900; margin-top: 8px; text-transform: uppercase; line-height: 1.2;">${student.name}</div>
-              <div style="font-size: 8px; font-weight: 900; color: #475569; margin-top: 4px; text-transform: uppercase;">Institutional Personnel</div>
+              <div style="font-size: 6px; font-weight: 900; color: #475569; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px;">GRADE</div>
+              <div style="font-size: 11px; font-weight: 900; color: white;">${student.grade.replace('Grade ', '')}</div>
             </div>
-            <div style="background: #1e293b; padding: 8px; border-radius: 6px;">
-              <div style="font-size: 7px; font-weight: 900; color: #475569; text-transform: uppercase; letter-spacing: 1px;">Access Identity</div>
-              <div style="font-size: 16px; font-weight: 900; color: white; letter-spacing: -0.5px;">${student.id}</div>
-            </div>
-            <div style="display: flex; justify-content: space-between; align-items: flex-end;">
-              <div>
-                <div style="font-size: 6px; font-weight: 900; color: #475569; text-transform: uppercase;">Level</div>
-                <div style="font-size: 10px; font-weight: 900;">${student.grade}</div>
-              </div>
-              <div style="font-size: 10px; font-weight: 900; color: #3b82f6; opacity: 0.5;">2025</div>
+            <div>
+              <div style="font-size: 6px; font-weight: 900; color: #475569; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px;">STATUS</div>
+              <div style="font-size: 11px; font-weight: 900; color: #10b981;">ACTIVE</div>
             </div>
           </div>
+
+          <!-- Bottom Accent Bar -->
+          <div style="position: absolute; bottom: 0; left: 0; right: 0; height: 8px; background: #2563eb;"></div>
         </div>
       </div>
     `;
 
     try {
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise(r => setTimeout(r, 600));
       const node = document.getElementById('pvc-card-target');
       if (node) {
-        const dataUrl = await toPng(node, { pixelRatio: 3 });
+        const dataUrl = await toPng(node, { 
+          pixelRatio: 4, 
+          skipFonts: false,
+          style: {
+            borderRadius: '16px'
+          }
+        });
         setPvcImage(dataUrl);
       }
     } finally {
@@ -184,7 +203,7 @@ const StudentRegistry: React.FC<{ onNavigate: (page: Page) => void }> = ({ onNav
              <button onClick={() => { setPvcImage(null); setSelectedForPrint(null); }} className="absolute top-8 right-8 text-slate-500 hover:text-white"><X size={32}/></button>
              <div className="text-center mb-8">
                <h3 className="text-2xl font-black uppercase italic text-white">Institutional Pass</h3>
-               <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">PVC Card Layout Ready</p>
+               <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Professional Identity Template</p>
              </div>
              
              <div className="bg-slate-950 p-6 rounded-3xl mb-8 flex items-center justify-center border border-slate-800 shadow-inner">
@@ -223,7 +242,7 @@ const StudentRegistry: React.FC<{ onNavigate: (page: Page) => void }> = ({ onNav
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/80 backdrop-blur-md">
           <div className="text-center">
             <Loader2 className="animate-spin text-blue-500 mx-auto mb-6" size={64} />
-            <p className="text-xl font-black uppercase italic tracking-tighter">Assembling Identity Artifact...</p>
+            <p className="text-xl font-black uppercase italic tracking-tighter">Rendering Official ID Card...</p>
           </div>
         </div>
       )}

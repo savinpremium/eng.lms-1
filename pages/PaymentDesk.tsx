@@ -20,20 +20,24 @@ const PaymentDesk: React.FC = () => {
   const [isScannerActive, setIsScannerActive] = useState(false);
   const [isDecodingFile, setIsDecodingFile] = useState(false);
   const [scannerError, setScannerError] = useState<string | null>(null);
+  const [isSecure, setIsSecure] = useState(true);
 
   const scannerRef = useRef<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    const hasMedia = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+    const secure = window.isSecureContext || window.location.hostname === 'localhost';
+    setIsSecure(!!secure && hasMedia);
+
     return storageService.listenStudents(setStudents);
   }, []);
 
-  // Effect to handle the imperative scanner initialization
   useEffect(() => {
     let active = true;
     if (isScannerActive && isScannerModalOpen) {
       const initScanner = async () => {
-        await new Promise(r => setTimeout(r, 100)); // Wait for Modal mount
+        await new Promise(r => setTimeout(r, 300)); // Longer wait for modal
         if (!active) return;
 
         try {
@@ -49,7 +53,15 @@ const PaymentDesk: React.FC = () => {
           scannerRef.current = new Html5Qrcode("qr-reader-payment");
           await scannerRef.current.start(
             { facingMode: "environment" },
-            { fps: 20, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
+            { 
+              fps: 20, 
+              qrbox: (w: number, h: number) => {
+                const min = Math.min(w, h);
+                const s = Math.floor(min * 0.7);
+                return { width: s, height: s };
+              },
+              aspectRatio: undefined 
+            },
             (decodedText: string) => {
               const student = students.find(s => s.id.toUpperCase() === decodedText.trim().toUpperCase());
               if (student) {
@@ -62,7 +74,7 @@ const PaymentDesk: React.FC = () => {
         } catch (e: any) {
           console.error("Scanner Error:", e);
           if (active) {
-            setScannerError(e.name === 'NotAllowedError' ? "Permission denied." : "Initialization failed.");
+            setScannerError(e.name === 'NotAllowedError' ? "Permission denied." : "Hardware restricted.");
             setIsScannerActive(false);
           }
         }
@@ -94,8 +106,8 @@ const PaymentDesk: React.FC = () => {
 
   const startScanner = async () => {
     setScannerError(null);
-    if (!window.isSecureContext && window.location.hostname !== 'localhost') {
-      setScannerError("Live camera requires HTTPS. Please use 'Capture Photo' instead.");
+    if (!isSecure && window.location.hostname !== 'localhost') {
+      setScannerError("Secure context (HTTPS) required for live video.");
       return;
     }
     setIsScannerActive(true);
@@ -108,9 +120,7 @@ const PaymentDesk: React.FC = () => {
     setIsDecodingFile(true);
     try {
       const Html5Qrcode = (window as any).Html5Qrcode;
-      // Use hidden render-buffer if modal isn't open
-      const mountId = isScannerModalOpen ? "qr-reader-payment" : "render-buffer";
-      const html5QrCode = new Html5Qrcode(mountId, false);
+      const html5QrCode = new Html5Qrcode("render-buffer", false);
       const decodedText = await html5QrCode.scanFile(file, true);
       const student = students.find(s => s.id.toUpperCase() === decodedText.trim().toUpperCase());
       if (student) {
@@ -118,11 +128,11 @@ const PaymentDesk: React.FC = () => {
         audioService.playSuccess();
         closeScanner();
       } else {
-        alert("System Notice: Identity ID decoded (" + decodedText + ") but not recognized in local database.");
+        alert("ID decoded (" + decodedText + ") but no record found.");
       }
     } catch (err) {
       console.error("File Scan Error:", err);
-      alert("Verification Failed: Could not identify a valid QR code in the captured photo.");
+      alert("No QR detected. Please ensure the code is clear and retry.");
     } finally {
       setIsDecodingFile(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -370,17 +380,19 @@ const PaymentDesk: React.FC = () => {
                 <div className="text-center p-8 space-y-6">
                    <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex items-center gap-3 text-left">
                       <Info size={24} className="text-blue-500" />
-                      <p className="text-[9px] font-black uppercase text-slate-500 tracking-widest leading-relaxed">Browser security blocks live video on HTTP. Use 'Capture Photo' if required.</p>
+                      <p className="text-[9px] font-black uppercase text-slate-500 tracking-widest leading-relaxed">Secure context check: {isSecure ? 'VERIFIED' : 'RESTRICTED'}.</p>
                    </div>
                    
                    <div className="flex flex-col gap-4 w-full max-w-xs mx-auto">
-                     <button 
-                      onClick={startScanner}
-                      className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all shadow-xl flex items-center justify-center gap-3 border-b-4 border-blue-800"
-                     >
-                      <ScanQrCode size={18} />
-                      Open Stream
-                     </button>
+                     {isSecure && (
+                       <button 
+                        onClick={startScanner}
+                        className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all shadow-xl flex items-center justify-center gap-3 border-b-4 border-blue-800"
+                       >
+                        <ScanQrCode size={18} />
+                        Open Stream
+                       </button>
+                     )}
                      
                      <div className="relative">
                         <input 
@@ -394,10 +406,10 @@ const PaymentDesk: React.FC = () => {
                         <button 
                           onClick={() => fileInputRef.current?.click()}
                           disabled={isDecodingFile}
-                          className="w-full bg-slate-800 hover:bg-slate-750 text-slate-300 px-8 py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all flex items-center justify-center gap-3 border border-slate-700 shadow-xl"
+                          className={`w-full ${!isSecure ? 'bg-blue-600 border-blue-800 text-white' : 'bg-slate-800 border-slate-700 text-slate-300'} px-8 py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all flex items-center justify-center gap-3 border-b-4 shadow-xl`}
                         >
-                          {isDecodingFile ? <Loader2 className="animate-spin" size={18} /> : <ImageIcon size={18} />}
-                          {isDecodingFile ? 'Analyzing...' : 'Capture Photo'}
+                          {isDecodingFile ? <Loader2 className="animate-spin" size={18} /> : <Camera size={18} />}
+                          {isDecodingFile ? 'Analyzing...' : (!isSecure ? 'Capture Photo' : 'Use Fallback')}
                         </button>
                       </div>
                    </div>
@@ -407,11 +419,11 @@ const PaymentDesk: React.FC = () => {
                    )}
                 </div>
               ) : (
-                <div id="qr-reader-payment" className="w-full h-full overflow-hidden"></div>
+                <div id="qr-reader-payment" className="w-full h-full"></div>
               )}
             </div>
             
-            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-600 mt-6 text-center">Position QR within viewfinder</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-600 mt-6 text-center">Center QR within viewfinder</p>
           </div>
         </div>
       )}

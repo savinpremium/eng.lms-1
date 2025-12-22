@@ -55,7 +55,7 @@ const App: React.FC = () => {
       return;
     }
 
-    // Demo Portal restriction
+    // Demo Portal restriction logic
     if (auth.isDemo) {
       const allowedDemoPages = [Page.ATTENDANCE, Page.PAYMENTS];
       if (!allowedDemoPages.includes(page)) {

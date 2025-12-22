@@ -52,14 +52,19 @@ const PaymentDesk: React.FC = () => {
       const canvas = canvasRef.current;
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
       if (ctx) {
-        canvas.height = videoRef.current.videoHeight;
-        canvas.width = videoRef.current.videoWidth;
-        ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        // High sensitivity scan: optimized resolution
+        const scanWidth = 640;
+        const scanHeight = (videoRef.current.videoHeight / videoRef.current.videoWidth) * scanWidth;
+        
+        canvas.width = scanWidth;
+        canvas.height = scanHeight;
+        
+        ctx.drawImage(videoRef.current, 0, 0, scanWidth, scanHeight);
+        const imageData = ctx.getImageData(0, 0, scanWidth, scanHeight);
         
         if ((window as any).jsQR) {
           const code = (window as any).jsQR(imageData.data, imageData.width, imageData.height, {
-            inversionAttempts: "dontInvert",
+            inversionAttempts: "attemptBoth",
           });
 
           if (code && code.data && code.data.toUpperCase().startsWith('STU-')) {
@@ -261,7 +266,7 @@ const PaymentDesk: React.FC = () => {
           <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-500" size={24} />
           <input 
             placeholder="Search by name or ID..."
-            className="w-full bg-slate-900 border border-slate-800 rounded-2xl pl-16 pr-8 py-4 md:py-5 text-xl font-black tracking-tight focus:outline-none focus:border-blue-600 transition-all shadow-xl"
+            className="w-full bg-slate-900 border border-slate-800 rounded-2xl pl-16 pr-8 py-4 md:py-5 text-xl font-black tracking-tight focus:outline-none focus:border-blue-600 transition-all shadow-xl text-white"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -275,7 +280,7 @@ const PaymentDesk: React.FC = () => {
                   className="w-full flex items-center justify-between p-4 hover:bg-slate-800 rounded-xl transition-all"
                 >
                   <div className="text-left">
-                    <p className="font-black text-lg uppercase tracking-tight">{s.name}</p>
+                    <p className="font-black text-lg uppercase tracking-tight text-white">{s.name}</p>
                     <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest">{s.id}</p>
                   </div>
                   <ChevronRight className="text-slate-700" size={20}/>
@@ -389,7 +394,7 @@ const PaymentDesk: React.FC = () => {
         </div>
       )}
 
-      {/* QR Scanner Modal */}
+      {/* QR Scanner Modal - CORRECT MIRRORING */}
       {isScanning && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6 backdrop-blur-3xl bg-slate-950/80">
           <div className="bg-slate-900 w-full max-w-xl p-8 rounded-[4rem] border border-slate-800 shadow-3xl overflow-hidden relative">
@@ -402,7 +407,8 @@ const PaymentDesk: React.FC = () => {
             </div>
             
             <div className="relative rounded-[3rem] overflow-hidden border-8 border-slate-800 bg-black">
-              <video ref={videoRef} className="w-full h-[400px] object-cover" playsInline />
+              {/* Corrected: Environment camera scale-x-1 */}
+              <video ref={videoRef} className="w-full h-[400px] object-cover scale-x-1" playsInline />
               <canvas ref={canvasRef} className="hidden" />
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="w-64 h-64 border-4 border-blue-600/60 rounded-[3rem] animate-pulse"></div>
@@ -438,7 +444,7 @@ const PaymentDesk: React.FC = () => {
                 <Printer size={20} />
                 Print
               </button>
-              <a href={previewImage} download="ClassFee_Receipt.png" className="bg-slate-800 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-3 hover:bg-slate-700 transition-all uppercase tracking-widest text-xs text-center">
+              <a href={previewImage} download="ClassFee_Receipt.png" className="bg-slate-800 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-3 hover:bg-slate-700 transition-all uppercase tracking-widest text-xs flex items-center justify-center">
                 <Download size={20} />
                 Download
               </a>

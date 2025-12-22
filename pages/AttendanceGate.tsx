@@ -21,17 +21,18 @@ const AttendanceGate: React.FC = () => {
   const scanTimeoutRef = useRef<any>(null);
 
   useEffect(() => {
-    return storageService.listenStudents((data) => {
+    const unsub = storageService.listenStudents((data) => {
       setStudents(data);
       setIsDataLoaded(true);
     });
+    return () => unsub();
   }, []);
 
   const startScanner = async () => {
     setCameraError(null);
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error("Camera API not available.");
+        throw new Error("Camera API not supported on this device.");
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -55,17 +56,21 @@ const AttendanceGate: React.FC = () => {
       const canvas = canvasRef.current;
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
       if (ctx) {
-        canvas.height = videoRef.current.videoHeight;
-        canvas.width = videoRef.current.videoWidth;
-        ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        // Optimization: Use a smaller canvas for scanning to increase speed and sensitivity
+        const scanWidth = 640;
+        const scanHeight = (videoRef.current.videoHeight / videoRef.current.videoWidth) * scanWidth;
+        
+        canvas.width = scanWidth;
+        canvas.height = scanHeight;
+        
+        ctx.drawImage(videoRef.current, 0, 0, scanWidth, scanHeight);
+        const imageData = ctx.getImageData(0, 0, scanWidth, scanHeight);
         
         if ((window as any).jsQR) {
           const code = (window as any).jsQR(imageData.data, imageData.width, imageData.height, {
-            inversionAttempts: "dontInvert",
+            inversionAttempts: "attemptBoth", // Significant boost for inverted QR codes and low light
           });
 
-          // Ensure detection is robust and only processed if IDLE
           if (code && code.data && code.data.toUpperCase().startsWith('STU-')) {
             handleScan(code.data.toUpperCase());
           }
@@ -92,11 +97,11 @@ const AttendanceGate: React.FC = () => {
   };
 
   const handleScan = async (studentId: string) => {
-    if (status !== 'IDLE' || !isDataLoaded) return;
+    // Crucial: Only handle scan if idle and data is fully loaded
+    if (status !== 'IDLE' || !isDataLoaded || students.length === 0) return;
     
     setStatus('PROCESSING');
 
-    // Case-insensitive matching for robust ID detection
     const student = students.find(s => s.id.toUpperCase() === studentId.toUpperCase());
     
     if (student) {
@@ -105,7 +110,6 @@ const AttendanceGate: React.FC = () => {
       
       const isPaid = student.lastPaymentMonth >= currentMonth;
 
-      // Check if already marked for today
       const attendance = await storageService.getAttendance();
       const alreadyMarked = attendance.some(a => a.studentId === student.id && a.date === today);
 
@@ -117,7 +121,6 @@ const AttendanceGate: React.FC = () => {
         return;
       }
 
-      // MARK ATTENDANCE
       const entryId = await storageService.addAttendance({
         id: '',
         studentId: student.id,
@@ -125,7 +128,6 @@ const AttendanceGate: React.FC = () => {
         timestamp: Date.now()
       });
 
-      // AUTO SMS ALERT to parent
       const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       const msg = `Excellence English: ${student.name} has arrived at the institute at ${timeStr}. Attendance marked. ස්තුතියි.`;
       smsService.sendSMS(student, msg, 'Attendance');
@@ -143,13 +145,10 @@ const AttendanceGate: React.FC = () => {
       } else {
         setStatus('GRACE');
         audioService.playWarning();
-        const utterance = new SpeechSynthesisUtterance(`Grace Period authorized for ${student.name}. Please settle fees soon.`);
-        utterance.rate = 0.9;
-        window.speechSynthesis.speak(utterance);
+        audioService.speak(`Grace period active for ${student.name}. Please update fees.`);
         showNotification(`Recorded (GRACE): ${student.name} - Fees Overdue`, 'warning');
         setTimeout(() => setStatus('IDLE'), 3500);
       }
-      
     } else {
       setStatus('ERROR');
       audioService.playError();
@@ -188,10 +187,10 @@ const AttendanceGate: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
         <div className={`relative rounded-[5rem] overflow-hidden border-8 transition-all duration-700 shadow-3xl bg-slate-900 min-h-[550px] flex items-center justify-center animate-in zoom-in-95 ${
-          status === 'SUCCESS' ? 'border-emerald-500 shadow-emerald-500/20' : 
-          status === 'GRACE' ? 'border-amber-500 shadow-amber-500/20' : 
-          status === 'ERROR' ? 'border-rose-500 shadow-rose-500/20' : 
-          'border-slate-800 shadow-blue-900/10'
+          status === 'SUCCESS' ? 'border-emerald-500' : 
+          status === 'GRACE' ? 'border-amber-500' : 
+          status === 'ERROR' ? 'border-rose-500' : 
+          'border-slate-800'
         }`}>
           {cameraError ? (
             <div className="p-16 text-center flex flex-col items-center gap-6">
@@ -209,14 +208,15 @@ const AttendanceGate: React.FC = () => {
             </div>
           ) : (
             <>
-              <video ref={videoRef} className="w-full h-[550px] object-cover" playsInline muted />
+              {/* Corrected: Environment camera is NOT mirrored (scale-x-1) */}
+              <video ref={videoRef} className="w-full h-[550px] object-cover scale-x-1" playsInline muted />
               <canvas ref={canvasRef} className="hidden" />
               
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                 <div className={`w-80 h-80 border-4 rounded-[4.5rem] flex items-center justify-center transition-all duration-500 ${
-                  status === 'SUCCESS' ? 'border-emerald-500 scale-110 shadow-[0_0_100px_rgba(16,185,129,0.3)] bg-emerald-500/10' : 
-                  status === 'GRACE' ? 'border-amber-500 scale-110 shadow-[0_0_100px_rgba(245,158,11,0.3)] bg-amber-500/10' : 
-                  status === 'ERROR' ? 'border-rose-500 scale-90 shadow-[0_0_100px_rgba(244,63,94,0.3)] bg-rose-500/10' : 
+                  status === 'SUCCESS' ? 'border-emerald-500 bg-emerald-500/10 shadow-[0_0_80px_rgba(16,185,129,0.2)]' : 
+                  status === 'GRACE' ? 'border-amber-500 bg-amber-500/10 shadow-[0_0_80px_rgba(245,158,11,0.2)]' : 
+                  status === 'ERROR' ? 'border-rose-500 bg-rose-500/10 shadow-[0_0_80px_rgba(244,63,94,0.2)]' : 
                   'border-white/20'
                 }`}>
                   {status === 'SUCCESS' && <Check className="text-emerald-500" size={120} strokeWidth={4} />}
@@ -227,20 +227,12 @@ const AttendanceGate: React.FC = () => {
                 </div>
               </div>
 
-              <div className={`absolute inset-x-0 bottom-0 p-10 flex flex-col items-center justify-center text-5xl font-black uppercase tracking-tighter italic backdrop-blur-3xl transition-all duration-700 ${
-                status === 'SUCCESS' ? 'bg-emerald-600/90 text-white translate-y-0' :
-                status === 'GRACE' ? 'bg-amber-600/90 text-white translate-y-0' :
-                status === 'ERROR' ? 'bg-rose-600/90 text-white translate-y-0' :
-                'translate-y-full'
-              }`}>
-                <div className="flex items-center">
-                   {status === 'SUCCESS' ? <ShieldCheck className="mr-4" size={48}/> : <AlertCircle className="mr-4" size={48}/>}
-                   {status === 'SUCCESS' ? 'PAID' : status === 'GRACE' ? 'GRACE' : 'ERROR'}
+              {!isDataLoaded && (
+                <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-xl flex flex-col items-center justify-center text-center p-12">
+                   <Loader2 className="animate-spin text-blue-500 mb-6" size={48} />
+                   <p className="text-sm font-black uppercase tracking-[0.4em] text-slate-400">Syncing Institutional Database...</p>
                 </div>
-                <p className="text-sm tracking-[0.3em] font-black mt-2 opacity-80">
-                   {status === 'SUCCESS' ? 'ENTRY AUTHORIZED' : status === 'GRACE' ? 'FEES DUE - 24H GRACE' : 'INVALID PASS'}
-                </p>
-              </div>
+              )}
             </>
           )}
         </div>
@@ -279,7 +271,7 @@ const AttendanceGate: React.FC = () => {
               Recent Authentications
             </h3>
             <div className="space-y-4">
-              {recentRecords.length > 0 ? recentRecords.map((r, i) => (
+              {recentRecords.map((r, i) => (
                 <div key={i} className="flex justify-between items-center bg-slate-900/30 p-6 rounded-[2rem] border border-slate-800/30 hover:bg-slate-900/50 transition-all group">
                   <div className="text-left">
                     <span className="font-black text-slate-200 uppercase text-lg leading-none block">{r.name}</span>
@@ -287,7 +279,8 @@ const AttendanceGate: React.FC = () => {
                   </div>
                   <span className="text-[9px] bg-slate-800 text-slate-400 group-hover:bg-blue-600 group-hover:text-white px-4 py-2 rounded-full font-black tracking-widest uppercase transition-all">{r.grade}</span>
                 </div>
-              )) : (
+              ))}
+              {recentRecords.length === 0 && (
                 <div className="py-8 text-center opacity-20">
                    <p className="text-slate-500 font-bold uppercase text-xs tracking-widest">Historical Log Empty</p>
                 </div>

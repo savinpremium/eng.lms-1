@@ -51,7 +51,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate, onLogout, isD
         </div>
         <div>
           <h1 className="font-black text-xl tracking-tighter uppercase leading-none text-blue-500">EngLMS</h1>
-          <p className="text-[10px] tracking-[0.2em] font-bold text-slate-500 uppercase">{isDemo ? 'Demo Access' : 'Institutional Console'}</p>
+          <p className="text-[10px] tracking-[0.2em] font-bold text-slate-500 uppercase">{isDemo ? 'Demo Mode' : 'Institutional Console'}</p>
         </div>
       </div>
 

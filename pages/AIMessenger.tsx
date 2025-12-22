@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { storageService } from '../services/storageService';
 import { generateWhatsAppDraft, MessageType } from '../services/geminiService';
 import { Student } from '../types';
-import { MessageSquare, Send, Sparkles, Copy, Trash2, User, Search, Loader2, Calendar, BookOpen, UserPlus } from 'lucide-react';
+import { MessageSquare, Send, Sparkles, Copy, Trash2, User, Search, Loader2, Calendar, BookOpen, UserPlus, Type as TypeIcon } from 'lucide-react';
 
 const AIMessenger: React.FC = () => {
   const [students, setStudents] = useState<Student[]>([]);
@@ -11,6 +11,9 @@ const AIMessenger: React.FC = () => {
   const [draft, setDraft] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [manualMode, setManualMode] = useState(false);
+  const [customEng, setCustomEng] = useState('');
+  const [customSin, setCustomSin] = useState('');
 
   useEffect(() => {
     return storageService.listenStudents(setStudents);
@@ -23,6 +26,7 @@ const AIMessenger: React.FC = () => {
 
   const handleGenerate = async (type: MessageType) => {
     if (!selectedStudent) return;
+    setManualMode(false);
     setIsGenerating(true);
     setDraft('');
     try {
@@ -34,6 +38,18 @@ const AIMessenger: React.FC = () => {
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleManualDraft = () => {
+    if (!selectedStudent) return;
+    
+    const header = "EXCELLENCE ENGLISH - OFFICIAL NOTIFICATION\n\n";
+    const subject = "Subject: Institutional Update Regarding " + selectedStudent.name + "\n\n";
+    const bodyEng = customEng + "\n\n";
+    const bodySin = customSin + "\n\n";
+    const footer = "Excellence English Office: 077 123 4567\nThank you / ස්තුතියි.";
+    
+    setDraft(header + subject + bodyEng + bodySin + footer);
   };
 
   const copyToClipboard = () => {
@@ -53,7 +69,7 @@ const AIMessenger: React.FC = () => {
   return (
     <div className="space-y-12 pb-20">
       <header className="animate-in fade-in slide-in-from-top-4 duration-500">
-        <h1 className="text-6xl font-black tracking-tighter uppercase italic leading-none">Bilingual AI</h1>
+        <h1 className="text-6xl font-black tracking-tighter uppercase italic leading-none">Bilingual Hub</h1>
         <p className="text-slate-500 font-bold uppercase text-[10px] tracking-[0.5em] mt-3">English & Sinhala Parent Communication Hub</p>
       </header>
 
@@ -70,7 +86,7 @@ const AIMessenger: React.FC = () => {
               />
             </div>
 
-            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+            <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
               {filtered.map(s => (
                 <button 
                   key={s.id}
@@ -93,33 +109,72 @@ const AIMessenger: React.FC = () => {
 
           {selectedStudent && (
             <div className="bg-slate-900/50 p-8 rounded-[3.5rem] border border-slate-800 shadow-2xl animate-in zoom-in-95 duration-500">
-              <p className="text-[10px] font-black tracking-[0.5em] uppercase text-slate-600 mb-6">Select Specific Protocol</p>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <button onClick={() => handleGenerate('payment')} className="flex flex-col items-center gap-3 p-4 bg-slate-950 border border-slate-800 rounded-2xl hover:border-blue-500 transition-all group">
-                  <Sparkles size={20} className="text-blue-500" />
-                  <span className="text-[8px] font-black uppercase tracking-widest">Fees Update</span>
-                </button>
-                <button onClick={() => handleGenerate('absence')} className="flex flex-col items-center gap-3 p-4 bg-slate-950 border border-slate-800 rounded-2xl hover:border-rose-500 transition-all group">
-                  <MessageSquare size={20} className="text-rose-500" />
-                  <span className="text-[8px] font-black uppercase tracking-widest">Absence Alert</span>
-                </button>
-                <button onClick={() => handleGenerate('registration')} className="flex flex-col items-center gap-3 p-4 bg-slate-950 border border-slate-800 rounded-2xl hover:border-emerald-500 transition-all group">
-                  <UserPlus size={20} className="text-emerald-500" />
-                  <span className="text-[8px] font-black uppercase tracking-widest">Welcome Kit</span>
-                </button>
-                <button onClick={() => handleGenerate('schedule')} className="flex flex-col items-center gap-3 p-4 bg-slate-950 border border-slate-800 rounded-2xl hover:border-amber-500 transition-all group">
-                  <Calendar size={20} className="text-amber-500" />
-                  <span className="text-[8px] font-black uppercase tracking-widest">Class Update</span>
-                </button>
-                <button onClick={() => handleGenerate('exam')} className="flex flex-col items-center gap-3 p-4 bg-slate-950 border border-slate-800 rounded-2xl hover:border-purple-500 transition-all group">
-                  <BookOpen size={20} className="text-purple-500" />
-                  <span className="text-[8px] font-black uppercase tracking-widest">Exam Results</span>
-                </button>
-                <button onClick={() => handleGenerate('general')} className="flex flex-col items-center gap-3 p-4 bg-slate-950 border border-slate-800 rounded-2xl hover:border-slate-500 transition-all group">
-                  <Send size={20} className="text-slate-400" />
-                  <span className="text-[8px] font-black uppercase tracking-widest">General Msg</span>
+              <div className="flex justify-between items-center mb-6">
+                <p className="text-[10px] font-black tracking-[0.5em] uppercase text-slate-600 italic">Select Mode</p>
+                <button 
+                  onClick={() => setManualMode(!manualMode)}
+                  className={`px-4 py-2 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all ${manualMode ? 'bg-blue-600 text-white' : 'bg-slate-950 text-slate-500 border border-slate-800'}`}
+                >
+                  {manualMode ? 'Switch to AI' : 'Switch to Manual'}
                 </button>
               </div>
+
+              {manualMode ? (
+                <div className="space-y-4 animate-in fade-in duration-300">
+                  <div className="space-y-2">
+                    <label className="text-[8px] font-black uppercase tracking-[0.4em] text-slate-600 ml-2">English Content</label>
+                    <textarea 
+                      placeholder="Type your message in English..."
+                      className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 font-bold text-xs h-24 focus:border-blue-500 outline-none transition-all"
+                      value={customEng}
+                      onChange={(e) => setCustomEng(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[8px] font-black uppercase tracking-[0.4em] text-slate-600 ml-2">Sinhala Content</label>
+                    <textarea 
+                      placeholder="සිංහලෙන් ටයිප් කරන්න..."
+                      className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 font-bold text-xs h-24 focus:border-blue-500 outline-none transition-all"
+                      value={customSin}
+                      onChange={(e) => setCustomSin(e.target.value)}
+                    />
+                  </div>
+                  <button 
+                    onClick={handleManualDraft}
+                    className="w-full bg-slate-800 hover:bg-slate-750 text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 transition-all"
+                  >
+                    <TypeIcon size={16} />
+                    Apply Custom Draft
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 animate-in fade-in duration-300">
+                  <button onClick={() => handleGenerate('payment')} className="flex flex-col items-center gap-3 p-4 bg-slate-950 border border-slate-800 rounded-2xl hover:border-blue-500 transition-all group">
+                    <Sparkles size={20} className="text-blue-500" />
+                    <span className="text-[8px] font-black uppercase tracking-widest">Fees Update</span>
+                  </button>
+                  <button onClick={() => handleGenerate('absence')} className="flex flex-col items-center gap-3 p-4 bg-slate-950 border border-slate-800 rounded-2xl hover:border-rose-500 transition-all group">
+                    <MessageSquare size={20} className="text-rose-500" />
+                    <span className="text-[8px] font-black uppercase tracking-widest">Absence Alert</span>
+                  </button>
+                  <button onClick={() => handleGenerate('registration')} className="flex flex-col items-center gap-3 p-4 bg-slate-950 border border-slate-800 rounded-2xl hover:border-emerald-500 transition-all group">
+                    <UserPlus size={20} className="text-emerald-500" />
+                    <span className="text-[8px] font-black uppercase tracking-widest">Welcome Kit</span>
+                  </button>
+                  <button onClick={() => handleGenerate('schedule')} className="flex flex-col items-center gap-3 p-4 bg-slate-950 border border-slate-800 rounded-2xl hover:border-amber-500 transition-all group">
+                    <Calendar size={20} className="text-amber-500" />
+                    <span className="text-[8px] font-black uppercase tracking-widest">Class Update</span>
+                  </button>
+                  <button onClick={() => handleGenerate('exam')} className="flex flex-col items-center gap-3 p-4 bg-slate-950 border border-slate-800 rounded-2xl hover:border-purple-500 transition-all group">
+                    <BookOpen size={20} className="text-purple-500" />
+                    <span className="text-[8px] font-black uppercase tracking-widest">Exam Results</span>
+                  </button>
+                  <button onClick={() => handleGenerate('general')} className="flex flex-col items-center gap-3 p-4 bg-slate-950 border border-slate-800 rounded-2xl hover:border-slate-500 transition-all group">
+                    <Send size={20} className="text-slate-400" />
+                    <span className="text-[8px] font-black uppercase tracking-widest">General Msg</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -127,7 +182,7 @@ const AIMessenger: React.FC = () => {
         <div className="space-y-8 animate-in slide-in-from-right-8 duration-700">
           <div className="bg-slate-900 p-10 rounded-[4rem] border border-slate-800 shadow-3xl min-h-[500px] flex flex-col relative overflow-hidden">
             <div className="flex justify-between items-center mb-8 relative z-10">
-              <h3 className="text-2xl font-black uppercase italic tracking-tighter">Bilingual Draft</h3>
+              <h3 className="text-2xl font-black uppercase italic tracking-tighter">Official Draft</h3>
               {draft && (
                 <button onClick={() => setDraft('')} className="w-10 h-10 bg-slate-950 rounded-xl flex items-center justify-center text-slate-700 hover:text-rose-500 transition-all border border-slate-800">
                   <Trash2 size={18} />

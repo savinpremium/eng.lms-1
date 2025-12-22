@@ -85,7 +85,7 @@ const App: React.FC = () => {
       case Page.PORTAL:
         return <StudentPortal onBack={() => navigate(Page.LANDING)} />;
       case Page.DASHBOARD:
-        return <Dashboard />;
+        return <Dashboard onNavigate={navigate} />;
       case Page.STUDENTS:
         return <StudentRegistry onNavigate={navigate} />;
       case Page.ATTENDANCE:

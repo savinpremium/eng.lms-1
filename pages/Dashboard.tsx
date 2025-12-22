@@ -11,10 +11,14 @@ import {
   ResponsiveContainer, 
   Cell 
 } from 'recharts';
-import { Users, TrendingUp, Calendar, AlertCircle, ShieldEllipsis, MessageSquare, ArrowRight, Loader2, GraduationCap, LibraryBig } from 'lucide-react';
-import { Student, AttendanceRecord, PaymentRecord, Grade, ResultRecord, MaterialRecord } from '../types';
+import { Users, Calendar, ShieldEllipsis, MessageSquare, Loader2, GraduationCap, LibraryBig, ScanQrCode, CreditCard, ArrowUpRight } from 'lucide-react';
+import { Student, AttendanceRecord, PaymentRecord, Grade, ResultRecord, MaterialRecord, Page } from '../types';
 
-const Dashboard: React.FC = () => {
+interface DashboardProps {
+  onNavigate: (page: Page) => void;
+}
+
+const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const [students, setStudents] = useState<Student[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
@@ -46,7 +50,6 @@ const Dashboard: React.FC = () => {
   const stats = useMemo(() => {
     const today = new Date().toISOString().split('T')[0];
     const todayAttendance = attendance.filter(a => a.date === today).length;
-    const totalRevenue = payments.reduce((acc, curr) => acc + curr.amount, 0);
     const pendingCount = students.filter(s => s.lastPaymentMonth < today.slice(0, 7)).length;
 
     return [
@@ -113,6 +116,39 @@ const Dashboard: React.FC = () => {
           </button>
         </div>
       </header>
+
+      {/* QUICK LAUNCH TERMINAL */}
+      <section className="animate-in fade-in slide-in-from-bottom-8 duration-700">
+        <h3 className="text-[10px] font-black tracking-[0.5em] uppercase text-slate-600 mb-8 flex items-center gap-3 italic">
+          <ArrowUpRight size={18} className="text-blue-500" />
+          Quick Launch Terminal
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <button 
+            onClick={() => onNavigate(Page.ATTENDANCE)}
+            className="group relative bg-emerald-600 p-12 rounded-[4.5rem] flex items-center justify-between overflow-hidden shadow-2xl shadow-emerald-900/20 hover:scale-[1.02] transition-all border-4 border-emerald-500/50"
+          >
+            <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-white/5 rounded-full group-hover:scale-125 transition-transform duration-1000"></div>
+            <div className="relative z-10 text-left">
+              <p className="text-5xl font-black tracking-tighter uppercase italic text-white leading-none mb-2">QR Gate</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-emerald-100/60">Activate Attendance Scanner</p>
+            </div>
+            <ScanQrCode size={64} className="text-white relative z-10 group-hover:rotate-12 transition-transform" />
+          </button>
+
+          <button 
+            onClick={() => onNavigate(Page.PAYMENTS)}
+            className="group relative bg-blue-700 p-12 rounded-[4.5rem] flex items-center justify-between overflow-hidden shadow-2xl shadow-blue-900/20 hover:scale-[1.02] transition-all border-4 border-blue-600/50"
+          >
+            <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-white/5 rounded-full group-hover:scale-125 transition-transform duration-1000"></div>
+            <div className="relative z-10 text-left">
+              <p className="text-5xl font-black tracking-tighter uppercase italic text-white leading-none mb-2">Payments</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-blue-100/60">Launch Financial Ledger</p>
+            </div>
+            <CreditCard size={64} className="text-white relative z-10 group-hover:-translate-y-2 transition-transform" />
+          </button>
+        </div>
+      </section>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-100">
         {stats.map((stat, idx) => (

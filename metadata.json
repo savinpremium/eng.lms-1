@@ -1,0 +1,7 @@
+{
+  "name": "EngLMS - Excellence English Management System",
+  "description": "A high-security Education Management System for English institutes featuring QR attendance, financial ledgers, and AI parent messaging.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

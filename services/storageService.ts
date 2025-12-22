@@ -1,7 +1,7 @@
 
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, set, get, push, update, onValue, child, remove } from "firebase/database";
-import { Student, AttendanceRecord, PaymentRecord } from '../types';
+import { Student, AttendanceRecord, PaymentRecord, ResultRecord, MaterialRecord } from '../types';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDneDiUzFALG_DcH1gNJmzB0WIddQcDxsA",
@@ -18,6 +18,14 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 export const storageService = {
+  // Connection Status
+  onConnectionChange: (callback: (connected: boolean) => void) => {
+    const connectedRef = ref(db, ".info/connected");
+    return onValue(connectedRef, (snap) => {
+      callback(snap.val() === true);
+    });
+  },
+
   // Students
   getStudents: async (): Promise<Student[]> => {
     const dbRef = ref(db);
@@ -113,7 +121,37 @@ export const storageService = {
     await remove(ref(db, `payments/${id}`));
   },
 
-  // Auth / OTP (Transient Storage)
+  // Assessment Results
+  listenResults: (callback: (records: ResultRecord[]) => void) => {
+    const resRef = ref(db, 'results');
+    return onValue(resRef, (snapshot) => {
+      if (snapshot.exists()) callback(Object.values(snapshot.val()));
+      else callback([]);
+    });
+  },
+
+  saveResult: async (result: ResultRecord) => {
+    const newResRef = push(ref(db, 'results'));
+    const id = newResRef.key as string;
+    await set(newResRef, { ...result, id });
+  },
+
+  // Materials
+  listenMaterials: (callback: (records: MaterialRecord[]) => void) => {
+    const matRef = ref(db, 'materials');
+    return onValue(matRef, (snapshot) => {
+      if (snapshot.exists()) callback(Object.values(snapshot.val()));
+      else callback([]);
+    });
+  },
+
+  saveMaterial: async (material: MaterialRecord) => {
+    const newMatRef = push(ref(db, 'materials'));
+    const id = newMatRef.key as string;
+    await set(newMatRef, { ...material, id });
+  },
+
+  // Auth / OTP
   generateOTP: async (): Promise<string> => {
     const otp = Math.floor(1000 + Math.random() * 9000).toString();
     const expiry = Date.now() + 5 * 60 * 1000;

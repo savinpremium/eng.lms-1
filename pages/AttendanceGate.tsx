@@ -2,11 +2,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { storageService } from '../services/storageService';
 import { audioService } from '../services/audioService';
-import { ShieldCheck, AlertCircle, Scan, History, Camera, AlertTriangle, UserCheck, RotateCcw, Check, X } from 'lucide-react';
+import { ShieldCheck, AlertCircle, Scan, History, Camera, AlertTriangle, UserCheck, RotateCcw, Check, X, Bell } from 'lucide-react';
 import { Student } from '../types';
 
 const AttendanceGate: React.FC = () => {
-  const [status, setStatus] = useState<'IDLE' | 'SUCCESS' | 'ERROR'>('IDLE');
+  const [status, setStatus] = useState<'IDLE' | 'SUCCESS' | 'ERROR' | 'GRACE'>('IDLE');
+  const [notification, setNotification] = useState<{message: string, type: 'success' | 'warning' | 'info'} | null>(null);
   const [lastStudent, setLastStudent] = useState<Student | null>(null);
   const [lastEntryId, setLastEntryId] = useState<string | null>(null);
   const [recentRecords, setRecentRecords] = useState<Student[]>([]);
@@ -79,6 +80,11 @@ const AttendanceGate: React.FC = () => {
     };
   }, []);
 
+  const showNotification = (message: string, type: 'success' | 'warning' | 'info') => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 4000);
+  };
+
   const handleScan = async (studentId: string) => {
     if (status !== 'IDLE') return;
 
@@ -86,46 +92,55 @@ const AttendanceGate: React.FC = () => {
     
     if (student) {
       const today = new Date().toISOString().split('T')[0];
+      const currentMonth = new Date().toISOString().slice(0, 7); 
+      
+      const isPaid = student.lastPaymentMonth >= currentMonth;
+
+      // Check if already marked for today
       const attendance = await storageService.getAttendance();
       const alreadyMarked = attendance.some(a => a.studentId === studentId && a.date === today);
 
-      const currentMonth = new Date().toISOString().slice(0, 7); 
-      const isPaid = student.lastPaymentMonth >= currentMonth;
-
       if (alreadyMarked) {
-        setStatus(isPaid ? 'SUCCESS' : 'ERROR');
-        audioService.speak(`Attendance already logged for ${student.name}. Status: ${isPaid ? 'Paid' : 'Not Paid'}`);
+        setStatus('SUCCESS');
+        showNotification(`${student.name} already checked in.`, 'info');
+        audioService.speak(`${student.name} already checked in.`);
         setTimeout(() => setStatus('IDLE'), 2000);
         return;
       }
 
-      if (!isPaid) {
-        setStatus('ERROR');
-        audioService.playError();
-        // Pronounce loudly as requested
-        const utterance = new SpeechSynthesisUtterance("NOT PAID");
-        utterance.volume = 1.0;
-        utterance.rate = 0.8;
-        window.speechSynthesis.speak(utterance);
-        setTimeout(() => setStatus('IDLE'), 4000);
-      } else {
-        const entryId = await storageService.addAttendance({
-          id: '',
-          studentId,
-          date: today,
-          timestamp: Date.now()
-        });
-        setLastStudent(student);
-        setLastEntryId(entryId);
-        setRecentRecords(prev => [student, ...prev].slice(0, 5));
+      // MARK ATTENDANCE ALWAYS (Fulfilling the request for marking even if unpaid)
+      const entryId = await storageService.addAttendance({
+        id: '',
+        studentId,
+        date: today,
+        timestamp: Date.now()
+      });
+
+      setLastStudent(student);
+      setLastEntryId(entryId);
+      setRecentRecords(prev => [student, ...prev].slice(0, 5));
+
+      if (isPaid) {
         setStatus('SUCCESS');
         audioService.playSuccess();
-        audioService.speak("PAID. Welcome.");
+        audioService.speak(`Paid. Welcome ${student.name}.`);
+        showNotification(`Attendance Recorded: ${student.name}`, 'success');
         setTimeout(() => setStatus('IDLE'), 2000);
+      } else {
+        // GRACE PERIOD LOGIC: Allow for 24 hours (today)
+        setStatus('GRACE');
+        audioService.playWarning();
+        const utterance = new SpeechSynthesisUtterance(`Grace Period authorized for ${student.name}. Please settle fees soon.`);
+        utterance.rate = 0.9;
+        window.speechSynthesis.speak(utterance);
+        showNotification(`Recorded (GRACE): ${student.name} - Fees Overdue`, 'warning');
+        setTimeout(() => setStatus('IDLE'), 3500);
       }
+      
     } else {
       setStatus('ERROR');
       audioService.playError();
+      showNotification("Identity not found in database.", "warning");
       setTimeout(() => setStatus('IDLE'), 1500);
     }
   };
@@ -137,19 +152,32 @@ const AttendanceGate: React.FC = () => {
     setRecentRecords(prev => prev.slice(1));
     setLastStudent(null);
     setLastEntryId(null);
-    alert("Entry removed.");
+    showNotification("Entry removed successfully.", "info");
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-12 pb-20">
+    <div className="max-w-5xl mx-auto space-y-12 pb-20 relative">
+      {/* Staff Notification Toast */}
+      {notification && (
+        <div className={`fixed top-10 left-1/2 -translate-x-1/2 z-[100] px-8 py-5 rounded-[2rem] border shadow-2xl flex items-center gap-4 animate-in slide-in-from-top-10 duration-500 ${
+          notification.type === 'success' ? 'bg-emerald-600 border-emerald-500 text-white' :
+          notification.type === 'warning' ? 'bg-amber-600 border-amber-500 text-white' :
+          'bg-blue-600 border-blue-500 text-white'
+        }`}>
+          <Bell className="animate-bounce" size={24} />
+          <p className="font-black uppercase tracking-tight text-base">{notification.message}</p>
+        </div>
+      )}
+
       <header className="text-center animate-in fade-in slide-in-from-top-4 duration-500">
-        <h1 className="text-6xl font-black tracking-tighter uppercase italic leading-none mb-3">Gate Terminal</h1>
+        <h1 className="text-6xl font-black tracking-tighter uppercase italic leading-none mb-3 text-white">Gate Terminal</h1>
         <p className="text-slate-500 font-bold uppercase tracking-[0.6em] text-[10px]">Secure Institutional Pass Verification</p>
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
         <div className={`relative rounded-[5rem] overflow-hidden border-8 transition-all duration-700 shadow-3xl bg-slate-900 min-h-[550px] flex items-center justify-center animate-in zoom-in-95 ${
           status === 'SUCCESS' ? 'border-emerald-500 shadow-emerald-500/20' : 
+          status === 'GRACE' ? 'border-amber-500 shadow-amber-500/20' : 
           status === 'ERROR' ? 'border-rose-500 shadow-rose-500/20' : 
           'border-slate-800 shadow-blue-900/10'
         }`}>
@@ -169,16 +197,18 @@ const AttendanceGate: React.FC = () => {
             </div>
           ) : (
             <>
-              <video ref={videoRef} className="w-full h-[550px] object-cover" playsInline muted />
+              <video ref={videoRef} className="w-full h-[550px] object-cover scale-x-[-1]" playsInline muted />
               <canvas ref={canvasRef} className="hidden" />
               
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                 <div className={`w-80 h-80 border-4 rounded-[4.5rem] flex items-center justify-center transition-all duration-500 ${
                   status === 'SUCCESS' ? 'border-emerald-500 scale-110 shadow-[0_0_100px_rgba(16,185,129,0.3)] bg-emerald-500/10' : 
+                  status === 'GRACE' ? 'border-amber-500 scale-110 shadow-[0_0_100px_rgba(245,158,11,0.3)] bg-amber-500/10' : 
                   status === 'ERROR' ? 'border-rose-500 scale-90 shadow-[0_0_100px_rgba(244,63,94,0.3)] bg-rose-500/10' : 
                   'border-white/20'
                 }`}>
                   {status === 'SUCCESS' && <Check className="text-emerald-500" size={120} strokeWidth={4} />}
+                  {status === 'GRACE' && <AlertCircle className="text-amber-500" size={120} strokeWidth={4} />}
                   {status === 'ERROR' && <X className="text-rose-500" size={120} strokeWidth={4} />}
                   {status === 'IDLE' && <Scan className="text-white/20 animate-pulse" size={80} />}
                 </div>
@@ -186,15 +216,16 @@ const AttendanceGate: React.FC = () => {
 
               <div className={`absolute inset-x-0 bottom-0 p-10 flex flex-col items-center justify-center text-5xl font-black uppercase tracking-tighter italic backdrop-blur-3xl transition-all duration-700 ${
                 status === 'SUCCESS' ? 'bg-emerald-600/90 text-white translate-y-0' :
+                status === 'GRACE' ? 'bg-amber-600/90 text-white translate-y-0' :
                 status === 'ERROR' ? 'bg-rose-600/90 text-white translate-y-0' :
                 'translate-y-full'
               }`}>
                 <div className="flex items-center">
                    {status === 'SUCCESS' ? <ShieldCheck className="mr-4" size={48}/> : <AlertCircle className="mr-4" size={48}/>}
-                   {status === 'SUCCESS' ? 'PAID' : 'NOT PAID'}
+                   {status === 'SUCCESS' ? 'PAID' : status === 'GRACE' ? 'GRACE' : 'ERROR'}
                 </div>
                 <p className="text-sm tracking-[0.3em] font-black mt-2 opacity-80">
-                   {status === 'SUCCESS' ? 'ACCESS GRANTED' : 'SETTLEMENT REQUIRED'}
+                   {status === 'SUCCESS' ? 'ENTRY AUTHORIZED' : status === 'GRACE' ? 'FEES DUE - 24H GRACE' : 'INVALID PASS'}
                 </p>
               </div>
             </>
@@ -211,8 +242,8 @@ const AttendanceGate: React.FC = () => {
               <div className="animate-in zoom-in duration-500">
                 <p className="text-5xl font-black tracking-tighter mb-3 text-white uppercase italic leading-none">{lastStudent.name}</p>
                 <div className="flex items-center gap-3 text-emerald-500 font-black text-xs uppercase tracking-[0.3em] mb-8">
-                   <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-                   Personnel Authorization Confirmed
+                   <div className={`w-2.5 h-2.5 rounded-full animate-pulse ${status === 'GRACE' ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]' : 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]'}`} />
+                   Identity Marked Successfully
                 </div>
                 <button 
                   onClick={undoLastEntry}

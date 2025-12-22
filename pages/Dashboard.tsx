@@ -11,13 +11,15 @@ import {
   ResponsiveContainer, 
   Cell 
 } from 'recharts';
-import { Users, TrendingUp, Calendar, AlertCircle, ShieldEllipsis, MessageSquare, ArrowRight, Loader2 } from 'lucide-react';
-import { Student, AttendanceRecord, PaymentRecord, Grade } from '../types';
+import { Users, TrendingUp, Calendar, AlertCircle, ShieldEllipsis, MessageSquare, ArrowRight, Loader2, GraduationCap, LibraryBig } from 'lucide-react';
+import { Student, AttendanceRecord, PaymentRecord, Grade, ResultRecord, MaterialRecord } from '../types';
 
 const Dashboard: React.FC = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
+  const [results, setResults] = useState<ResultRecord[]>([]);
+  const [materials, setMaterials] = useState<MaterialRecord[]>([]);
   const [otp, setOtp] = useState<string | null>(null);
   const [remindingId, setRemindingId] = useState<string | null>(null);
 
@@ -31,7 +33,14 @@ const Dashboard: React.FC = () => {
       setPayments(p);
     };
     fetchData();
-    return storageService.listenStudents(setStudents);
+    const unsubS = storageService.listenStudents(setStudents);
+    const unsubR = storageService.listenResults(setResults);
+    const unsubM = storageService.listenMaterials(setMaterials);
+    return () => {
+      unsubS();
+      unsubR();
+      unsubM();
+    };
   }, []);
 
   const stats = useMemo(() => {
@@ -41,12 +50,12 @@ const Dashboard: React.FC = () => {
     const pendingCount = students.filter(s => s.lastPaymentMonth < today.slice(0, 7)).length;
 
     return [
-      { label: 'Enrolled Students', value: students.length, icon: Users, color: 'text-blue-500' },
+      { label: 'Academic Force', value: students.length, icon: Users, color: 'text-blue-500' },
       { label: 'Gate entries (Today)', value: todayAttendance, icon: Calendar, color: 'text-emerald-500' },
-      { label: 'Gross Revenue', value: `LKR ${totalRevenue.toLocaleString()}`, icon: TrendingUp, color: 'text-amber-500' },
-      { label: 'Pending Overdue', value: pendingCount, icon: AlertCircle, color: 'text-rose-500' },
+      { label: 'Assessments Logged', value: results.length, icon: GraduationCap, color: 'text-purple-500' },
+      { label: 'Study Hub Assets', value: materials.length, icon: LibraryBig, color: 'text-amber-500' },
     ];
-  }, [students, attendance, payments]);
+  }, [students, attendance, results, materials]);
 
   const pendingStudents = useMemo(() => {
     const currentMonth = new Date().toISOString().slice(0, 7);
@@ -112,7 +121,7 @@ const Dashboard: React.FC = () => {
               <stat.icon size={28} />
             </div>
             <p className="text-[10px] font-black tracking-[0.5em] uppercase text-slate-600 mb-2">{stat.label}</p>
-            <p className="text-5xl font-black tracking-tighter italic text-white">{stat.value}</p>
+            <p className="text-4xl font-black tracking-tighter italic text-white">{stat.value}</p>
           </div>
         ))}
       </div>

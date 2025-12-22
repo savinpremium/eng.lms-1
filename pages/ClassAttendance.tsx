@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { storageService } from '../services/storageService';
+import { audioService } from '../services/audioService';
 import { Student, AttendanceRecord, Grade } from '../types';
-import { Users, CheckCircle2, Circle, Search, ChevronDown, ChevronUp } from 'lucide-react';
+import { Users, CheckCircle2, Circle, Search, ChevronDown, ChevronUp, MousePointerClick, AlertCircle } from 'lucide-react';
 
 const ClassAttendance: React.FC = () => {
   const [students, setStudents] = useState<Student[]>([]);
@@ -34,16 +35,53 @@ const ClassAttendance: React.FC = () => {
     return data;
   }, [students, searchTerm]);
 
-  const getMonthlyAttendanceCount = (studentId: string) => {
-    return attendance.filter(a => a.studentId === studentId && a.date.startsWith(currentMonth)).length;
+  const getMonthlyAttendance = (studentId: string) => {
+    return attendance.filter(a => a.studentId === studentId && a.date.startsWith(currentMonth));
+  };
+
+  const handleManualMark = async (student: Student) => {
+    const today = new Date().toISOString().split('T')[0];
+    const isPaid = student.lastPaymentMonth >= currentMonth;
+    
+    // Check Duplicate Marking
+    const alreadyMarked = attendance.some(a => a.studentId === student.id && a.date === today);
+    if (alreadyMarked) {
+      alert("Attendance already logged for today.");
+      return;
+    }
+
+    // Grace Period Warning
+    if (!isPaid) {
+      if (!confirm(`GRACE PERIOD WARNING: Student ${student.name} is unpaid for ${currentMonth}. Proceed with marking attendance for today?`)) {
+        return;
+      }
+    } else {
+      if (!confirm(`Mark manual attendance for ${student.name} today?`)) {
+        return;
+      }
+    }
+
+    // Log Attendance
+    await storageService.addAttendance({
+      id: '',
+      studentId: student.id,
+      date: today,
+      timestamp: Date.now()
+    });
+    
+    if (isPaid) {
+      audioService.playSuccess();
+    } else {
+      audioService.playWarning();
+    }
   };
 
   return (
     <div className="space-y-12 pb-20">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8 animate-in fade-in slide-in-from-top-4 duration-500">
         <div>
-          <h1 className="text-6xl font-black tracking-tighter uppercase italic leading-none">Class Register</h1>
-          <p className="text-slate-500 font-bold uppercase text-[10px] tracking-[0.5em] mt-3">Monthly Attendance Protocol (4 Sessions / Month)</p>
+          <h1 className="text-6xl font-black tracking-tighter uppercase italic leading-none text-white">Class Register</h1>
+          <p className="text-slate-500 font-bold uppercase text-[10px] tracking-[0.5em] mt-3">Personnel Tracking Protocol (Grace Period Support)</p>
         </div>
         <div className="relative w-full md:w-80">
           <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-500" size={20} />
@@ -74,8 +112,8 @@ const ClassAttendance: React.FC = () => {
                     <Users size={28} />
                   </div>
                   <div className="text-left">
-                    <h3 className="text-2xl font-black uppercase italic tracking-tighter">{grade}</h3>
-                    <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">{studentsInGrade.length} Active Students</p>
+                    <h3 className="text-2xl font-black uppercase italic tracking-tighter text-white">{grade}</h3>
+                    <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">{studentsInGrade.length} Registered Personnel</p>
                   </div>
                 </div>
                 {isExpanded ? <ChevronUp size={24} className="text-slate-600" /> : <ChevronDown size={24} className="text-slate-600" />}
@@ -84,50 +122,65 @@ const ClassAttendance: React.FC = () => {
               {isExpanded && (
                 <div className="px-8 pb-8 animate-in slide-in-from-top-2 duration-300">
                   <div className="bg-slate-950 rounded-[2rem] border border-slate-800 overflow-hidden">
-                    <table className="w-full text-left">
+                    <table className="w-full text-left border-collapse">
                       <thead className="bg-slate-900/50 border-b border-slate-800">
                         <tr>
                           <th className="p-5 text-[9px] font-black tracking-[0.3em] uppercase text-slate-500">Student Identity</th>
-                          <th className="p-5 text-[9px] font-black tracking-[0.3em] uppercase text-slate-500 text-center">Session Tracker ({new Date().toLocaleString('default', { month: 'long' })})</th>
-                          <th className="p-5 text-[9px] font-black tracking-[0.3em] uppercase text-slate-500 text-right">Progress</th>
+                          <th className="p-5 text-[9px] font-black tracking-[0.3em] uppercase text-slate-500 text-center">Month Progress ({new Date().toLocaleString('default', { month: 'long' })})</th>
+                          <th className="p-5 text-[9px] font-black tracking-[0.3em] uppercase text-slate-500 text-right">Gate Action</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-800/50">
                         {studentsInGrade.map(s => {
-                          const count = getMonthlyAttendanceCount(s.id);
+                          const records = getMonthlyAttendance(s.id);
+                          const count = records.length;
+                          const isUnpaid = s.lastPaymentMonth < currentMonth;
+
                           return (
-                            <tr key={s.id} className="hover:bg-slate-900/20 transition-all group">
+                            <tr key={s.id} className={`hover:bg-slate-900/20 transition-all group ${isUnpaid ? 'bg-amber-500/[0.02]' : ''}`}>
                               <td className="p-5">
-                                <p className="font-black text-sm uppercase tracking-tight text-slate-200">{s.name}</p>
-                                <p className="text-[9px] font-black text-blue-500 uppercase tracking-widest">{s.id}</p>
+                                <div className="flex flex-col">
+                                  <div className="flex items-center gap-3">
+                                    <p className={`font-black text-sm uppercase tracking-tight ${isUnpaid ? 'text-amber-500' : 'text-slate-200'}`}>{s.name}</p>
+                                    {isUnpaid && (
+                                      <div className="flex items-center gap-1 bg-amber-500/10 text-amber-500 px-2 py-0.5 rounded-full text-[7px] font-black tracking-widest uppercase border border-amber-500/20">
+                                        <AlertCircle size={8} /> GRACE ELIGIBLE
+                                      </div>
+                                    )}
+                                  </div>
+                                  <p className="text-[9px] font-black text-blue-500 uppercase tracking-widest">{s.id}</p>
+                                </div>
                               </td>
                               <td className="p-5">
                                 <div className="flex justify-center items-center gap-3">
                                   {[1, 2, 3, 4].map(idx => (
-                                    <div key={idx} className="relative group">
+                                    <div key={idx} className="relative group/week">
                                       {idx <= count ? (
-                                        <CheckCircle2 size={24} className="text-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.2)]" />
+                                        <CheckCircle2 size={22} className="text-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.2)]" />
                                       ) : (
-                                        <Circle size={24} className="text-slate-800 group-hover:text-slate-700 transition-colors" />
+                                        <Circle size={22} className="text-slate-800" />
                                       )}
-                                      <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-[7px] font-black uppercase text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Week {idx}</span>
+                                      <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-[7px] font-black uppercase text-slate-700 opacity-0 group-hover/week:opacity-100 transition-opacity whitespace-nowrap">Session {idx}</span>
                                     </div>
                                   ))}
                                 </div>
                               </td>
                               <td className="p-5 text-right">
-                                <span className={`text-xs font-black uppercase italic ${count >= 4 ? 'text-emerald-500' : 'text-blue-500'}`}>
-                                  {count}/4 Complete
-                                </span>
+                                <button 
+                                  onClick={() => handleManualMark(s)}
+                                  className={`p-2 px-4 rounded-xl transition-all border flex items-center gap-2 text-[8px] font-black uppercase tracking-widest ml-auto shadow-lg bg-slate-900 border-slate-800 ${
+                                    isUnpaid 
+                                      ? 'text-amber-500 hover:bg-amber-600 hover:text-white hover:border-amber-500' 
+                                      : 'text-slate-400 hover:bg-blue-600 hover:text-white hover:border-blue-500'
+                                  }`}
+                                >
+                                  <MousePointerClick size={14} />
+                                  Mark Attended
+                                </button>
                               </td>
                             </tr>
                           );
                         })}
-                        {studentsInGrade.length === 0 && (
-                          <tr>
-                            <td colSpan={3} className="p-10 text-center text-slate-600 font-bold uppercase text-xs tracking-widest italic opacity-50">No students enrolled in this level</td>
-                          </tr>
-                        )}
                       </tbody>
                     </table>
                   </div>

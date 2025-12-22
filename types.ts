@@ -30,6 +30,25 @@ export interface PaymentRecord {
   timestamp: number;
 }
 
+export interface ResultRecord {
+  id: string;
+  studentId: string;
+  examName: string;
+  score: number;
+  grade: Grade;
+  date: string;
+}
+
+export interface MaterialRecord {
+  id: string;
+  title: string;
+  description: string;
+  link: string;
+  grade: Grade;
+  type: 'PDF' | 'Video' | 'Link';
+  date: string;
+}
+
 export interface AuthState {
   isStaff: boolean;
   staffId: string | null;
@@ -46,5 +65,7 @@ export enum Page {
   CLASS_ATTENDANCE = 'CLASS_ATTENDANCE',
   PAYMENTS = 'PAYMENTS',
   MESSENGER = 'MESSENGER',
-  ENROLLMENT = 'ENROLLMENT'
+  ENROLLMENT = 'ENROLLMENT',
+  EXAMS = 'EXAMS',
+  MATERIALS = 'MATERIALS'
 }

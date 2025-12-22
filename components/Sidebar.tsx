@@ -10,7 +10,9 @@ import {
   LogOut,
   ShieldCheck,
   UserPlus,
-  BookOpenCheck
+  BookOpenCheck,
+  GraduationCap,
+  LibraryBig
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -26,6 +28,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate, onLogout }) =
     { page: Page.ENROLLMENT, icon: UserPlus, label: 'Enrollment' },
     { page: Page.ATTENDANCE, icon: ScanQrCode, label: 'QR Gate' },
     { page: Page.CLASS_ATTENDANCE, icon: BookOpenCheck, label: 'Class Register' },
+    { page: Page.EXAMS, icon: GraduationCap, label: 'Assessment' },
+    { page: Page.MATERIALS, icon: LibraryBig, label: 'Study Hub' },
     { page: Page.PAYMENTS, icon: CreditCard, label: 'Payments' },
     { page: Page.MESSENGER, icon: MessageSquare, label: 'AI Messenger' },
   ];
@@ -42,18 +46,18 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate, onLogout }) =
         </div>
       </div>
 
-      <nav className="flex-1 px-4 space-y-2 mt-4">
+      <nav className="flex-1 px-4 space-y-1 mt-4 overflow-y-auto custom-scrollbar">
         {menuItems.map((item) => (
           <button
             key={item.page}
             onClick={() => onNavigate(item.page)}
-            className={`w-full flex items-center gap-4 px-6 py-4 rounded-3xl transition-all duration-300 font-bold ${
+            className={`w-full flex items-center gap-4 px-6 py-3 rounded-2xl transition-all duration-300 font-bold text-sm ${
               activePage === item.page 
                 ? 'bg-blue-600 text-white shadow-xl shadow-blue-500/20 translate-x-1' 
                 : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
             }`}
           >
-            <item.icon size={20} strokeWidth={activePage === item.page ? 3 : 2} />
+            <item.icon size={18} strokeWidth={activePage === item.page ? 3 : 2} />
             {item.label}
           </button>
         ))}

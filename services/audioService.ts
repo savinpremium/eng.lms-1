@@ -8,7 +8,7 @@ class AudioService {
     }
   }
 
-  private playTone(freq: number, type: OscillatorType, duration: number, volume: number = 0.1) {
+  public playTone(freq: number, type: OscillatorType, duration: number, volume: number = 0.1) {
     this.init();
     if (!this.ctx) return;
 
@@ -35,6 +35,11 @@ class AudioService {
 
   playError() {
     this.playTone(110, 'sawtooth', 0.5, 0.2);
+  }
+
+  playWarning() {
+    this.playTone(440, 'triangle', 0.3, 0.15);
+    setTimeout(() => this.playTone(440, 'triangle', 0.3, 0.15), 400);
   }
 
   playCash() {

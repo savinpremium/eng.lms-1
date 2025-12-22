@@ -3,24 +3,28 @@ import React, { useState, useEffect, useRef } from 'react';
 import { storageService } from '../services/storageService';
 import { audioService } from '../services/audioService';
 import { smsService } from '../services/smsService';
-import { ShieldCheck, AlertCircle, Scan, History, Camera, AlertTriangle, UserCheck, RotateCcw, Check, X, Bell } from 'lucide-react';
+import { ShieldCheck, AlertCircle, Scan, History, Camera, AlertTriangle, UserCheck, RotateCcw, Check, X, Bell, Loader2 } from 'lucide-react';
 import { Student } from '../types';
 
 const AttendanceGate: React.FC = () => {
-  const [status, setStatus] = useState<'IDLE' | 'SUCCESS' | 'ERROR' | 'GRACE'>('IDLE');
+  const [status, setStatus] = useState<'IDLE' | 'SUCCESS' | 'ERROR' | 'GRACE' | 'PROCESSING'>('IDLE');
   const [notification, setNotification] = useState<{message: string, type: 'success' | 'warning' | 'info'} | null>(null);
   const [lastStudent, setLastStudent] = useState<Student | null>(null);
   const [lastEntryId, setLastEntryId] = useState<string | null>(null);
   const [recentRecords, setRecentRecords] = useState<Student[]>([]);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const scanTimeoutRef = useRef<any>(null);
 
   useEffect(() => {
-    return storageService.listenStudents(setStudents);
+    return storageService.listenStudents((data) => {
+      setStudents(data);
+      setIsDataLoaded(true);
+    });
   }, []);
 
   const startScanner = async () => {
@@ -61,8 +65,9 @@ const AttendanceGate: React.FC = () => {
             inversionAttempts: "dontInvert",
           });
 
-          if (code && code.data && code.data.startsWith('STU-')) {
-            handleScan(code.data);
+          // Ensure detection is robust and only processed if IDLE
+          if (code && code.data && code.data.toUpperCase().startsWith('STU-')) {
+            handleScan(code.data.toUpperCase());
           }
         }
       }
@@ -87,9 +92,12 @@ const AttendanceGate: React.FC = () => {
   };
 
   const handleScan = async (studentId: string) => {
-    if (status !== 'IDLE') return;
+    if (status !== 'IDLE' || !isDataLoaded) return;
+    
+    setStatus('PROCESSING');
 
-    const student = students.find(s => s.id === studentId);
+    // Case-insensitive matching for robust ID detection
+    const student = students.find(s => s.id.toUpperCase() === studentId.toUpperCase());
     
     if (student) {
       const today = new Date().toISOString().split('T')[0];
@@ -99,7 +107,7 @@ const AttendanceGate: React.FC = () => {
 
       // Check if already marked for today
       const attendance = await storageService.getAttendance();
-      const alreadyMarked = attendance.some(a => a.studentId === studentId && a.date === today);
+      const alreadyMarked = attendance.some(a => a.studentId === student.id && a.date === today);
 
       if (alreadyMarked) {
         setStatus('SUCCESS');
@@ -112,7 +120,7 @@ const AttendanceGate: React.FC = () => {
       // MARK ATTENDANCE
       const entryId = await storageService.addAttendance({
         id: '',
-        studentId,
+        studentId: student.id,
         date: today,
         timestamp: Date.now()
       });
@@ -201,7 +209,7 @@ const AttendanceGate: React.FC = () => {
             </div>
           ) : (
             <>
-              <video ref={videoRef} className="w-full h-[550px] object-cover scale-x-[-1]" playsInline muted />
+              <video ref={videoRef} className="w-full h-[550px] object-cover" playsInline muted />
               <canvas ref={canvasRef} className="hidden" />
               
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
@@ -214,6 +222,7 @@ const AttendanceGate: React.FC = () => {
                   {status === 'SUCCESS' && <Check className="text-emerald-500" size={120} strokeWidth={4} />}
                   {status === 'GRACE' && <AlertCircle className="text-amber-500" size={120} strokeWidth={4} />}
                   {status === 'ERROR' && <X className="text-rose-500" size={120} strokeWidth={4} />}
+                  {status === 'PROCESSING' && <Loader2 className="text-blue-500 animate-spin" size={80} strokeWidth={4} />}
                   {status === 'IDLE' && <Scan className="text-white/20 animate-pulse" size={80} />}
                 </div>
               </div>

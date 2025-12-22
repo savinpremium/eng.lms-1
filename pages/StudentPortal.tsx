@@ -46,8 +46,8 @@ const StudentPortal: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             inversionAttempts: "dontInvert",
           });
 
-          if (code && code.data && code.data.startsWith('STU-')) {
-            verifyId(code.data);
+          if (code && code.data && code.data.toUpperCase().startsWith('STU-')) {
+            verifyId(code.data.toUpperCase());
             const stream = videoRef.current.srcObject as MediaStream;
             stream.getTracks().forEach(track => track.stop());
           }
@@ -234,7 +234,8 @@ const StudentPortal: React.FC<{ onBack: () => void }> = ({ onBack }) => {
               <p className="text-slate-500 font-bold uppercase tracking-[0.5em] text-[10px] mt-2">Scan Student ID Pass</p>
             </div>
             <div className="relative rounded-[3rem] overflow-hidden border-8 border-slate-800 bg-black">
-              <video ref={videoRef} className="w-full h-[400px] object-cover" playsInline />
+              {/* Selfie camera IS mirrored */}
+              <video ref={videoRef} className="w-full h-[400px] object-cover scale-x-[-1]" playsInline />
               <canvas ref={canvasRef} className="hidden" />
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="w-64 h-64 border-4 border-blue-600/60 rounded-[3rem] animate-pulse"></div>

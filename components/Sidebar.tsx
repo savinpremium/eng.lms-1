@@ -22,23 +22,26 @@ interface SidebarProps {
   activePage: Page;
   onNavigate: (page: Page) => void;
   onLogout: () => void;
+  isDemo?: boolean;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate, onLogout }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate, onLogout, isDemo }) => {
   const menuItems = [
-    { page: Page.DASHBOARD, icon: LayoutDashboard, label: 'Monitor Station' },
-    { page: Page.GROUPS, icon: Layers, label: 'Class Batches' },
-    { page: Page.STUDENTS, icon: Users, label: 'Student Registry' },
-    { page: Page.ENROLLMENT, icon: UserPlus, label: 'Enrollment' },
-    { page: Page.ATTENDANCE, icon: ScanQrCode, label: 'QR Gate' },
-    { page: Page.CLASS_ATTENDANCE, icon: BookOpenCheck, label: 'Session Log' },
-    { page: Page.SCHEDULE, icon: CalendarDays, label: 'Timetable' },
-    { page: Page.EXAMS, icon: GraduationCap, label: 'Assessments' },
-    { page: Page.MATERIALS, icon: LibraryBig, label: 'Study Hub' },
-    { page: Page.PAYMENTS, icon: CreditCard, label: 'Payment Desk' },
-    { page: Page.MESSENGER, icon: MessageSquare, label: 'Human Messenger' },
-    { page: Page.COMM_HUB, icon: History, label: 'Audit Log' },
+    { page: Page.DASHBOARD, icon: LayoutDashboard, label: 'Monitor Station', staffOnly: true },
+    { page: Page.GROUPS, icon: Layers, label: 'Class Batches', staffOnly: true },
+    { page: Page.STUDENTS, icon: Users, label: 'Student Registry', staffOnly: true },
+    { page: Page.ENROLLMENT, icon: UserPlus, label: 'Enrollment', staffOnly: true },
+    { page: Page.ATTENDANCE, icon: ScanQrCode, label: 'QR Gate', staffOnly: false },
+    { page: Page.CLASS_ATTENDANCE, icon: BookOpenCheck, label: 'Session Log', staffOnly: true },
+    { page: Page.SCHEDULE, icon: CalendarDays, label: 'Timetable', staffOnly: true },
+    { page: Page.EXAMS, icon: GraduationCap, label: 'Assessments', staffOnly: true },
+    { page: Page.MATERIALS, icon: LibraryBig, label: 'Study Hub', staffOnly: true },
+    { page: Page.PAYMENTS, icon: CreditCard, label: 'Payment Desk', staffOnly: false },
+    { page: Page.MESSENGER, icon: MessageSquare, label: 'Human Messenger', staffOnly: true },
+    { page: Page.COMM_HUB, icon: History, label: 'Audit Log', staffOnly: true },
   ];
+
+  const visibleItems = isDemo ? menuItems.filter(item => !item.staffOnly) : menuItems;
 
   return (
     <aside className="w-full md:w-72 bg-slate-900/50 backdrop-blur-xl border-r border-slate-800 flex flex-col h-auto md:h-screen sticky top-0 z-40">
@@ -48,12 +51,12 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate, onLogout }) =
         </div>
         <div>
           <h1 className="font-black text-xl tracking-tighter uppercase leading-none text-blue-500">EngLMS</h1>
-          <p className="text-[10px] tracking-[0.2em] font-bold text-slate-500 uppercase">Institutional Console</p>
+          <p className="text-[10px] tracking-[0.2em] font-bold text-slate-500 uppercase">{isDemo ? 'Demo Access' : 'Institutional Console'}</p>
         </div>
       </div>
 
       <nav className="flex-1 px-4 space-y-1 mt-4 overflow-y-auto custom-scrollbar">
-        {menuItems.map((item) => (
+        {visibleItems.map((item) => (
           <button
             key={item.page}
             onClick={() => onNavigate(item.page)}

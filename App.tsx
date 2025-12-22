@@ -24,6 +24,7 @@ const App: React.FC = () => {
   const [isConnected, setIsConnected] = useState(true);
   const [auth, setAuth] = useState<AuthState>({
     isStaff: false,
+    isDemo: false,
     staffId: null,
     otp: null,
     otpExpiry: null
@@ -48,21 +49,42 @@ const App: React.FC = () => {
       Page.SCHEDULE,
       Page.GROUPS
     ];
+
     if (staffPages.includes(page) && !auth.isStaff) {
       setCurrentPage(Page.LANDING);
       return;
     }
+
+    // Demo Portal restriction
+    if (auth.isDemo) {
+      const allowedDemoPages = [Page.ATTENDANCE, Page.PAYMENTS];
+      if (!allowedDemoPages.includes(page)) {
+        setCurrentPage(Page.ATTENDANCE);
+        return;
+      }
+    }
+
     setCurrentPage(page);
     window.scrollTo(0, 0);
   };
 
-  const handleLoginSuccess = () => {
-    setAuth({ ...auth, isStaff: true, staffId: 'Iresha1978' });
-    setCurrentPage(Page.DASHBOARD);
+  const handleLoginSuccess = (isDemo: boolean) => {
+    setAuth({ 
+      ...auth, 
+      isStaff: true, 
+      isDemo: isDemo, 
+      staffId: isDemo ? 'Log123' : 'Iresha1978' 
+    });
+    
+    if (isDemo) {
+      setCurrentPage(Page.ATTENDANCE);
+    } else {
+      setCurrentPage(Page.DASHBOARD);
+    }
   };
 
   const logout = () => {
-    setAuth({ isStaff: false, staffId: null, otp: null, otpExpiry: null });
+    setAuth({ isStaff: false, isDemo: false, staffId: null, otp: null, otpExpiry: null });
     navigate(Page.LANDING);
   };
 
@@ -137,6 +159,7 @@ const App: React.FC = () => {
           activePage={currentPage} 
           onNavigate={navigate} 
           onLogout={logout} 
+          isDemo={auth.isDemo}
         />
       )}
       

@@ -62,8 +62,8 @@ const PaymentDesk: React.FC = () => {
             inversionAttempts: "dontInvert",
           });
 
-          if (code && code.data && code.data.startsWith('STU-')) {
-            const found = students.find(s => s.id === code.data);
+          if (code && code.data && code.data.toUpperCase().startsWith('STU-')) {
+            const found = students.find(s => s.id.toUpperCase() === code.data.toUpperCase());
             if (found) {
               setSelectedStudent(found);
               audioService.playSuccess();
@@ -402,7 +402,7 @@ const PaymentDesk: React.FC = () => {
             </div>
             
             <div className="relative rounded-[3rem] overflow-hidden border-8 border-slate-800 bg-black">
-              <video ref={videoRef} className="w-full h-[400px] object-cover scale-x-[-1]" playsInline />
+              <video ref={videoRef} className="w-full h-[400px] object-cover" playsInline />
               <canvas ref={canvasRef} className="hidden" />
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="w-64 h-64 border-4 border-blue-600/60 rounded-[3rem] animate-pulse"></div>

@@ -8,7 +8,7 @@ import { CheckCircle, ArrowRight, ShieldCheck, QrCode, Lock, Printer, UserCheck,
 
 interface LandingPageProps {
   onNavigate: (page: Page) => void;
-  onLoginSuccess: () => void;
+  onLoginSuccess: (isDemo: boolean) => void;
 }
 
 const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, onLoginSuccess }) => {
@@ -135,7 +135,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, onLoginSuccess })
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (loginForm.username === 'Iresha1978' && loginForm.password === 'Iresha1978') {
-      onLoginSuccess();
+      onLoginSuccess(false);
+    } else if (loginForm.username === 'Log123' && loginForm.password === 'Log123') {
+      onLoginSuccess(true);
     } else {
       audioService.playError();
     }

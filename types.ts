@@ -78,6 +78,7 @@ export interface ScheduleRecord {
 
 export interface AuthState {
   isStaff: boolean;
+  isDemo: boolean;
   staffId: string | null;
   otp: string | null;
   otpExpiry: number | null;

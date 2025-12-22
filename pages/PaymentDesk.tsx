@@ -5,7 +5,7 @@ import { audioService } from '../services/audioService';
 import { generateWhatsAppDraft } from '../services/geminiService';
 import { Student, PaymentRecord } from '../types';
 import { toPng } from 'html-to-image';
-import { Search, Printer, CreditCard, ChevronRight, User, Hash, ScanQrCode, X, CheckCircle, Loader2, Download, Sparkles, Zap } from 'lucide-react';
+import { Search, Printer, CreditCard, ChevronRight, User, Hash, ScanQrCode, X, CheckCircle, Loader2, Download, Sparkles, Zap, History } from 'lucide-react';
 
 const PaymentDesk: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -52,9 +52,8 @@ const PaymentDesk: React.FC = () => {
       const canvas = canvasRef.current;
       const ctx = canvas.getContext('2d', { alpha: false, willReadFrequently: true });
       if (ctx) {
-        // High Speed Vision Down-sampling
         const v = videoRef.current;
-        const w = 400; 
+        const w = 480; 
         const h = (v.videoHeight / v.videoWidth) * w;
         canvas.width = w;
         canvas.height = h;
@@ -63,15 +62,17 @@ const PaymentDesk: React.FC = () => {
         const imageData = ctx.getImageData(0, 0, w, h);
         const data = imageData.data;
 
-        // TURBO BINARIZATION
+        // HIGH CONTRAST VISION PRE-PROCESS
         for (let i = 0; i < data.length; i += 4) {
-          const luma = (data[i] * 0.3 + data[i + 1] * 0.59 + data[i + 2] * 0.11);
-          const bin = luma > 110 ? 255 : 0;
-          data[i] = data[i+1] = data[i+2] = bin;
+          let gray = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+          if (gray < 110) gray = gray * 0.4;
+          else if (gray > 150) gray = Math.min(255, gray * 1.3);
+          data[i] = data[i+1] = data[i+2] = gray;
         }
         
-        if ((window as any).jsQR) {
-          const code = (window as any).jsQR(data, w, h, { inversionAttempts: "attemptBoth" });
+        const jsQRFunc = (window as any).jsQR;
+        if (jsQRFunc) {
+          const code = jsQRFunc(data, w, h, { inversionAttempts: "attemptBoth" });
           if (code && code.data) {
             const raw = code.data.trim().toUpperCase();
             const match = raw.match(/(STU-\d{4}-\d{4})/);
@@ -179,8 +180,6 @@ const PaymentDesk: React.FC = () => {
     const buffer = document.getElementById('render-buffer');
     if (!buffer) return;
 
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${lastReceipt.id}`;
-
     buffer.innerHTML = `
       <div id="receipt-capture-target" style="width: 80mm; padding: 25px; font-family: 'JetBrains Mono', monospace; color: black; background: white; text-transform: uppercase; border: 1px dashed #ccc;">
         <center>
@@ -246,9 +245,9 @@ const PaymentDesk: React.FC = () => {
           {searchTerm && filteredStudents.length > 0 && !selectedStudent && (
             <div className="absolute top-full left-0 right-0 mt-4 bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-3xl z-50">
               {filteredStudents.map(s => (
-                <button key={s.id} onClick={() => { setSelectedStudent(s); setSearchTerm(''); }} className="w-full flex items-center justify-between p-4 hover:bg-slate-800 rounded-xl transition-all">
+                <button key={s.id} onClick={() => { setSelectedStudent(s); setSearchTerm(''); }} className="w-full flex items-center justify-between p-4 hover:bg-slate-800 rounded-xl transition-all text-white">
                   <div className="text-left">
-                    <p className="font-black text-lg uppercase text-white">{s.name}</p>
+                    <p className="font-black text-lg uppercase">{s.name}</p>
                     <p className="text-[10px] font-black text-blue-500 uppercase">{s.id}</p>
                   </div>
                   <ChevronRight className="text-slate-700" size={20}/>

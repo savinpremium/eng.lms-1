@@ -18,6 +18,12 @@ const AttendanceGate: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const requestRef = useRef<number | null>(null);
+  const statusRef = useRef(status);
+
+  // Keep ref in sync for the tick loop
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
 
   useEffect(() => {
     const unsub = storageService.listenStudents((data) => {
@@ -26,6 +32,38 @@ const AttendanceGate: React.FC = () => {
     });
     return () => unsub();
   }, []);
+
+  const tick = () => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    
+    if (video && canvas && video.readyState === video.HAVE_ENOUGH_DATA) {
+      if (video.videoWidth > 0 && video.videoHeight > 0) {
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (ctx) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          
+          // Access jsQR from global scope
+          const jsQR = (window as any).jsQR;
+          
+          if (typeof jsQR === 'function') {
+            const code = jsQR(imageData.data, imageData.width, imageData.height, {
+              inversionAttempts: "attemptBoth",
+            });
+
+            if (code && code.data && statusRef.current === 'IDLE') {
+              handleScan(code.data);
+            }
+          }
+        }
+      }
+    }
+    requestRef.current = requestAnimationFrame(tick);
+  };
 
   const startScanner = async () => {
     setCameraError(null);
@@ -40,45 +78,15 @@ const AttendanceGate: React.FC = () => {
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        // The 'play' call returns a promise
+        videoRef.current.setAttribute("playsinline", "true"); // required to tell iOS safari we don't want fullscreen
         await videoRef.current.play();
         setIsScanning(true);
         requestRef.current = requestAnimationFrame(tick);
       }
     } catch (err) {
       console.error("Camera error:", err);
-      setCameraError("Camera access denied or unavailable.");
+      setCameraError("Camera access denied or unavailable. Please ensure permissions are granted.");
     }
-  };
-
-  const tick = () => {
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    
-    if (video && canvas && video.readyState === video.HAVE_ENOUGH_DATA) {
-      const ctx = canvas.getContext('2d', { willReadFrequently: true });
-      if (ctx) {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        
-        // Access jsQR from global scope
-        const jsQR = (window as any).jsQR;
-        
-        if (typeof jsQR === 'function') {
-          const code = jsQR(imageData.data, imageData.width, imageData.height, {
-            inversionAttempts: "attemptBoth",
-          });
-
-          if (code && code.data && status === 'IDLE') {
-            handleScan(code.data);
-          }
-        }
-      }
-    }
-    requestRef.current = requestAnimationFrame(tick);
   };
 
   useEffect(() => {
@@ -92,7 +100,7 @@ const AttendanceGate: React.FC = () => {
   }, []);
 
   const handleScan = async (studentId: string) => {
-    if (status !== 'IDLE' || !isDataLoaded) return;
+    if (statusRef.current !== 'IDLE' || !isDataLoaded) return;
     
     const cleanId = studentId.trim().toUpperCase();
     const student = students.find(s => s.id.toUpperCase() === cleanId);
@@ -105,40 +113,45 @@ const AttendanceGate: React.FC = () => {
       const currentMonth = new Date().toISOString().slice(0, 7); 
       const isPaid = student.lastPaymentMonth >= currentMonth;
 
-      const attendance = await storageService.getAttendance();
-      const alreadyMarked = attendance.some(a => a.studentId === student.id && a.date === today);
+      try {
+        const attendance = await storageService.getAttendance();
+        const alreadyMarked = attendance.some(a => a.studentId === student.id && a.date === today);
 
-      if (alreadyMarked) {
-        setStatus('SUCCESS');
-        audioService.speak(`${student.name} already checked in.`);
+        if (alreadyMarked) {
+          setStatus('SUCCESS');
+          audioService.speak(`${student.name} already checked in.`);
+          setTimeout(() => setStatus('IDLE'), 2000);
+          return;
+        }
+
+        const entryId = await storageService.addAttendance({
+          id: '',
+          studentId: student.id,
+          date: today,
+          timestamp: Date.now()
+        });
+
+        setLastStudent(student);
+        setLastEntryId(entryId);
+        setRecentRecords(prev => [student, ...prev].slice(0, 5));
+
+        if (isPaid) {
+          setStatus('SUCCESS');
+          audioService.playSuccess();
+          audioService.speak(`Welcome, ${student.name}`);
+          setTimeout(() => setStatus('IDLE'), 2000);
+        } else {
+          setStatus('GRACE');
+          audioService.playWarning();
+          audioService.speak(`Payment pending for ${student.name}`);
+          setTimeout(() => setStatus('IDLE'), 3500);
+        }
+      } catch (e) {
+        console.error("Attendance log failed", e);
+        setStatus('ERROR');
         setTimeout(() => setStatus('IDLE'), 2000);
-        return;
-      }
-
-      const entryId = await storageService.addAttendance({
-        id: '',
-        studentId: student.id,
-        date: today,
-        timestamp: Date.now()
-      });
-
-      setLastStudent(student);
-      setLastEntryId(entryId);
-      setRecentRecords(prev => [student, ...prev].slice(0, 5));
-
-      if (isPaid) {
-        setStatus('SUCCESS');
-        audioService.playSuccess();
-        audioService.speak(`Welcome, ${student.name}`);
-        setTimeout(() => setStatus('IDLE'), 2000);
-      } else {
-        setStatus('GRACE');
-        audioService.playWarning();
-        audioService.speak(`Payment pending for ${student.name}`);
-        setTimeout(() => setStatus('IDLE'), 3500);
       }
     } else {
-      // Prevent rapid fire errors by checking if we just tried an invalid code
       setStatus('ERROR');
       audioService.playError();
       setTimeout(() => setStatus('IDLE'), 2000);
@@ -183,7 +196,7 @@ const AttendanceGate: React.FC = () => {
               </button>
             </div>
           ) : (
-            <div className="relative w-full h-[550px]">
+            <div className="relative w-full h-[550px] bg-black">
               <video 
                 ref={videoRef} 
                 className="w-full h-full object-cover" 
@@ -205,8 +218,9 @@ const AttendanceGate: React.FC = () => {
               </div>
 
               {!isScanning && (
-                <div className="absolute inset-0 bg-slate-900 flex items-center justify-center">
+                <div className="absolute inset-0 bg-slate-900 flex flex-col items-center justify-center gap-4">
                   <Loader2 className="animate-spin text-blue-500" size={48} />
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Initializing Optical Input...</p>
                 </div>
               )}
 

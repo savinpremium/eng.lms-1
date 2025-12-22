@@ -34,18 +34,54 @@ const PaymentDesk: React.FC = () => {
     );
   }, [searchTerm, students]);
 
+  const tick = () => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    
+    if (video && canvas && video.readyState === video.HAVE_ENOUGH_DATA) {
+      if (video.videoWidth > 0 && video.videoHeight > 0) {
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (ctx) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          
+          const jsQR = (window as any).jsQR;
+          if (typeof jsQR === 'function') {
+            const code = jsQR(imageData.data, imageData.width, imageData.height);
+            if (code && code.data) {
+              const student = students.find(s => s.id.toUpperCase() === code.data.trim().toUpperCase());
+              if (student) {
+                setSelectedStudent(student);
+                audioService.playSuccess();
+                stopScanner();
+                return;
+              }
+            }
+          }
+        }
+      }
+    }
+    requestRef.current = requestAnimationFrame(tick);
+  };
+
   const startScanner = async () => {
     setIsScanning(true);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'environment' } 
+      });
+      
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        videoRef.current.setAttribute("playsinline", "true");
         await videoRef.current.play();
         requestRef.current = requestAnimationFrame(tick);
       }
     } catch (e) {
       console.error("Scanner Error:", e);
-      alert("Scanner Error: Camera access required.");
+      alert("Scanner Error: Camera access required for optical scanning.");
       setIsScanning(false);
     }
   };
@@ -56,36 +92,6 @@ const PaymentDesk: React.FC = () => {
       (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
     }
     setIsScanning(false);
-  };
-
-  const tick = () => {
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    
-    if (video && canvas && video.readyState === video.HAVE_ENOUGH_DATA) {
-      const ctx = canvas.getContext('2d', { willReadFrequently: true });
-      if (ctx) {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        
-        const jsQR = (window as any).jsQR;
-        if (typeof jsQR === 'function') {
-          const code = jsQR(imageData.data, imageData.width, imageData.height);
-          if (code && code.data) {
-            const student = students.find(s => s.id.toUpperCase() === code.data.trim().toUpperCase());
-            if (student) {
-              setSelectedStudent(student);
-              audioService.playSuccess();
-              stopScanner();
-              return;
-            }
-          }
-        }
-      }
-    }
-    requestRef.current = requestAnimationFrame(tick);
   };
 
   const handleProcessPayment = async (student: Student, month: string) => {
@@ -309,7 +315,7 @@ const PaymentDesk: React.FC = () => {
       {isScanning && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xl flex items-center justify-center p-6">
           <div className="bg-slate-900 border border-slate-800 rounded-[3rem] p-8 w-full max-w-xl relative">
-            <button onClick={stopScanner} className="absolute top-6 right-6 text-slate-500 hover:text-white"><X size={32}/></button>
+            <button onClick={stopScanner} className="absolute top-6 right-6 text-slate-500 hover:text-white transition-all"><X size={32}/></button>
             <h3 className="text-2xl font-black uppercase italic mb-8">Pass Key Scanner</h3>
             <div className="relative rounded-3xl overflow-hidden bg-black aspect-video border-4 border-slate-800">
               <video ref={videoRef} className="w-full h-full object-cover" playsInline muted autoPlay />

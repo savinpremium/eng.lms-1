@@ -1,22 +1,11 @@
+
 import { GoogleGenAI } from "@google/genai";
 import { Student } from "../types";
 
-// Safe access to environment variables
-const getApiKey = () => {
-  try {
-    return (typeof process !== 'undefined' && process.env && process.env.API_KEY) || '';
-  } catch (e) {
-    return '';
-  }
-};
-
+// Refactored to strictly follow @google/genai coding guidelines
 export const generateWhatsAppDraft = async (student: Student, type: 'payment' | 'absence' | 'general'): Promise<string> => {
-  const apiKey = getApiKey();
-  if (!apiKey) {
-    return "Error: API key not configured. Please check environment variables.";
-  }
-
-  const ai = new GoogleGenAI({ apiKey });
+  // Always use process.env.API_KEY directly for initialization
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const prompt = `
     Generate a professional and friendly WhatsApp message for the parent of a student in an English language institute in Sri Lanka.
@@ -36,10 +25,12 @@ export const generateWhatsAppDraft = async (student: Student, type: 'payment' | 
   `;
 
   try {
+    // Correct usage of ai.models.generateContent with model and contents
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: prompt,
     });
+    // Use .text property directly
     return response.text || "Failed to generate message.";
   } catch (error) {
     console.error("Gemini Error:", error);

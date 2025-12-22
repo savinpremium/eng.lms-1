@@ -32,6 +32,19 @@ const PaymentDesk: React.FC = () => {
     );
   }, [searchTerm, students]);
 
+  const stopScanner = () => {
+    if (scannerLoopRef.current) {
+      cancelAnimationFrame(scannerLoopRef.current);
+      scannerLoopRef.current = null;
+    }
+    if (videoRef.current?.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+    }
+    setIsScanning(false);
+  };
+
   const tick = () => {
     if (videoRef.current && canvasRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
       const canvas = canvasRef.current;
@@ -42,7 +55,7 @@ const PaymentDesk: React.FC = () => {
         ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         
-        // Ensure jsQR is available on window
+        // Use jsQR from window scope
         if ((window as any).jsQR) {
           const code = (window as any).jsQR(imageData.data, imageData.width, imageData.height, {
             inversionAttempts: "dontInvert",
@@ -52,7 +65,6 @@ const PaymentDesk: React.FC = () => {
             const found = students.find(s => s.id === code.data);
             if (found) {
               setSelectedStudent(found);
-              setIsScanning(false);
               audioService.playSuccess();
               stopScanner();
               return;
@@ -61,7 +73,9 @@ const PaymentDesk: React.FC = () => {
         }
       }
     }
-    scannerLoopRef.current = requestAnimationFrame(tick);
+    if (isScanning) {
+      scannerLoopRef.current = requestAnimationFrame(tick);
+    }
   };
 
   const startScanner = async () => {
@@ -81,18 +95,6 @@ const PaymentDesk: React.FC = () => {
     }
   };
 
-  const stopScanner = () => {
-    if (scannerLoopRef.current) {
-      cancelAnimationFrame(scannerLoopRef.current);
-      scannerLoopRef.current = null;
-    }
-    if (videoRef.current?.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach(track => track.stop());
-      videoRef.current.srcObject = null;
-    }
-  };
-
   useEffect(() => {
     return () => stopScanner();
   }, []);
@@ -102,7 +104,7 @@ const PaymentDesk: React.FC = () => {
     setIsProcessing(true);
 
     const payment: PaymentRecord = {
-      id: '', // Service sets it
+      id: '', // Set by push key
       studentId: student.id,
       amount: 1000, 
       month,
@@ -119,7 +121,7 @@ const PaymentDesk: React.FC = () => {
       setLastReceipt({ ...payment, id });
       audioService.playCash();
     } catch (e) {
-      console.error(e);
+      console.error("Payment failed", e);
     } finally {
       setIsProcessing(false);
     }
@@ -142,7 +144,7 @@ const PaymentDesk: React.FC = () => {
     setSelectedStudent(rolledBackStudent);
     setLastReceipt(null);
     setPreviewImage(null);
-    alert("Payment undone successfully.");
+    alert("Payment reversed.");
   };
 
   const generateReceipt = async () => {
@@ -159,7 +161,7 @@ const PaymentDesk: React.FC = () => {
         <center>
           <div style="font-size: 20px; font-weight: 900; letter-spacing: -0.5px; margin-bottom: 5px;">EXCELLENCE ENGLISH</div>
           <div style="font-size: 10px; font-weight: 800; border: 1.5px solid black; padding: 3px 12px; display: inline-block; border-radius: 4px;">OFFICIAL RECEIPT</div>
-          <div style="font-size: 8px; margin-top: 8px; font-weight: 700;">Education Management Network</div>
+          <div style="font-size: 8px; margin-top: 8px; font-weight: 700;">Educational Network</div>
           <div style="font-size: 10px; margin-top: 15px;">================================</div>
         </center>
         
@@ -169,19 +171,18 @@ const PaymentDesk: React.FC = () => {
             <span>TIME: ${new Date(lastReceipt.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
           </div>
           <div style="margin-top: 5px;">RECEIPT ID: <span style="font-weight: 900;">${lastReceipt.id}</span></div>
-          <div>TERMINAL: ELMS-AUTH-78</div>
           
           <div style="font-size: 10px; margin: 15px 0;">--------------------------------</div>
           
-          <div style="font-weight: 900; font-size: 12px; margin-bottom: 5px;">STUDENT IDENTITY:</div>
+          <div style="font-weight: 900; font-size: 12px; margin-bottom: 5px;">STUDENT:</div>
           <div style="font-size: 16px; font-weight: 900; margin: 5px 0;">${selectedStudent.name}</div>
           <div style="font-weight: 700;">ID: ${selectedStudent.id}</div>
-          <div style="font-weight: 700;">LEVEL : ${selectedStudent.grade}</div>
+          <div style="font-weight: 700;">LEVEL: ${selectedStudent.grade}</div>
           
           <div style="font-size: 10px; margin: 15px 0;">--------------------------------</div>
           
           <div style="display: flex; justify-content: space-between; font-weight: 900; font-size: 13px;">
-            <span>${lastReceipt.month} FEES</span>
+            <span>FEES FOR ${lastReceipt.month}</span>
             <span>LKR 1,000.00</span>
           </div>
           
@@ -207,14 +208,14 @@ const PaymentDesk: React.FC = () => {
     `;
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 800));
       const node = document.getElementById('receipt-capture-target');
       if (node) {
         const dataUrl = await toPng(node, { pixelRatio: 2.5, skipFonts: true, fontEmbedCSS: '' });
         setPreviewImage(dataUrl);
       }
     } catch (err) {
-      console.error('Receipt generation failed:', err);
+      console.error('Receipt capture failed:', err);
     } finally {
       setIsGenerating(false);
       buffer.innerHTML = '';
@@ -234,7 +235,7 @@ const PaymentDesk: React.FC = () => {
     if (!selectedStudent || !lastReceipt) return;
     const phone = selectedStudent.contact.replace(/\D/g, '');
     const waPhone = phone.startsWith('0') ? '94' + phone.substring(1) : phone;
-    const text = encodeURIComponent(`Hello ${selectedStudent.parentName}, the receipt for ${selectedStudent.name}'s payment for ${lastReceipt.month} (Receipt ID: ${lastReceipt.id}) has been issued by Excellence English.`);
+    const text = encodeURIComponent(`Hello ${selectedStudent.parentName}, official receipt for ${selectedStudent.name}'s payment for ${lastReceipt.month} (Receipt ID: ${lastReceipt.id}) has been issued by Excellence English. You can collect the physical copy at the office.`);
     window.open(`https://wa.me/${waPhone}?text=${text}`, '_blank');
   };
 
@@ -249,23 +250,23 @@ const PaymentDesk: React.FC = () => {
     <div className="space-y-6 md:space-y-12 pb-20">
       <header className="flex justify-between items-center animate-in fade-in slide-in-from-top-4 duration-500">
         <div>
-          <h1 className="text-3xl md:text-5xl font-black tracking-tighter uppercase italic">Ledger</h1>
-          <p className="text-slate-500 font-bold uppercase text-[10px] tracking-[0.4em] mt-2">Financial Hub</p>
+          <h1 className="text-3xl md:text-5xl font-black tracking-tighter uppercase italic text-white">Payment Terminal</h1>
+          <p className="text-slate-500 font-bold uppercase text-[10px] tracking-[0.4em] mt-2">Institutional Ledger Hub</p>
         </div>
       </header>
 
-      <div className="flex flex-col md:flex-row gap-4 items-start animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
+      <div className="flex flex-col md:flex-row gap-4 items-start">
         <div className="relative group flex-1 w-full max-w-xl">
           <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-500" size={24} />
           <input 
-            placeholder="Search student..."
+            placeholder="Search student identity..."
             className="w-full bg-slate-900 border border-slate-800 rounded-2xl pl-16 pr-8 py-4 md:py-5 text-xl font-black tracking-tight focus:outline-none focus:border-blue-600 transition-all shadow-xl"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
           
           {searchTerm && filteredStudents.length > 0 && !selectedStudent && (
-            <div className="absolute top-full left-0 right-0 mt-4 bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-3xl z-50 animate-in fade-in slide-in-from-top-4">
+            <div className="absolute top-full left-0 right-0 mt-4 bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-3xl z-50 overflow-hidden animate-in slide-in-from-top-2">
               {filteredStudents.map(s => (
                 <button 
                   key={s.id}
@@ -288,7 +289,7 @@ const PaymentDesk: React.FC = () => {
           className="w-full md:w-auto bg-blue-600 hover:bg-blue-500 text-white px-10 py-4 md:py-5 rounded-2xl flex items-center justify-center gap-4 font-black shadow-lg transition-all transform hover:scale-105 uppercase tracking-tighter text-base md:text-lg"
         >
           <ScanQrCode size={28} />
-          Scan ID
+          Optical Scan
         </button>
       </div>
 
@@ -296,8 +297,8 @@ const PaymentDesk: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-8 duration-500">
           <div className="bg-slate-900/50 p-8 rounded-3xl border border-slate-800 space-y-10 shadow-3xl">
             <div className="flex justify-between items-center">
-              <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-4 italic">
-                <User className="text-blue-500" size={28}/>
+              <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-4 italic text-blue-500">
+                <User size={28}/>
                 Student Profile
               </h3>
               <button onClick={() => { setSelectedStudent(null); setLastReceipt(null); }} className="w-10 h-10 bg-slate-950 rounded-xl flex items-center justify-center text-slate-700 hover:text-white transition-all shadow-inner">
@@ -311,51 +312,39 @@ const PaymentDesk: React.FC = () => {
                   <Hash size={36} />
                 </div>
                 <div>
-                  <p className="text-2xl md:text-4xl font-black tracking-tighter uppercase leading-none mb-1">{selectedStudent.name}</p>
+                  <p className="text-2xl md:text-4xl font-black tracking-tighter uppercase leading-none mb-1 text-white">{selectedStudent.name}</p>
                   <div className="flex items-center gap-3">
                     <span className="text-blue-500 font-black uppercase text-xs tracking-[0.4em]">{selectedStudent.id}</span>
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <span className="text-emerald-500 font-black uppercase text-[10px] tracking-widest">Active Status</span>
+                    <span className="text-emerald-500 font-black uppercase text-[10px] tracking-widest">Active Level: {selectedStudent.grade}</span>
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 shadow-inner">
-                  <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.4em] mb-2">Grade</p>
-                  <p className="text-2xl font-black tracking-tighter">{selectedStudent.grade}</p>
-                </div>
-                <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 shadow-inner">
-                  <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.4em] mb-2">Settlement</p>
-                  <p className="text-xl font-black text-blue-400 uppercase tracking-tighter">{selectedStudent.lastPaymentMonth}</p>
-                </div>
+              <div className="p-8 bg-slate-950 rounded-3xl border border-slate-800 shadow-2xl">
+                <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.5em] mb-8">Pending Settlements</p>
+                {getUnpaidMonths(selectedStudent.lastPaymentMonth).map(month => (
+                  <button 
+                    key={month}
+                    disabled={isProcessing}
+                    onClick={() => handleProcessPayment(selectedStudent, month)}
+                    className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white p-6 rounded-2xl flex items-center justify-between font-black tracking-tighter transition-all shadow-xl shadow-blue-600/10 group relative overflow-hidden"
+                  >
+                    <div className="relative z-10 flex flex-col items-start">
+                      <span className="text-xl md:text-2xl uppercase leading-none">{month} Fees</span>
+                      <span className="text-[9px] opacity-70 tracking-widest uppercase font-bold mt-1">Institutional Tuition</span>
+                    </div>
+                    <div className="relative z-10 flex items-center gap-4">
+                      <span className="text-xl font-black tracking-tight">LKR 1,000</span>
+                      <CreditCard size={28} className="group-hover:translate-x-1 transition-transform"/>
+                    </div>
+                  </button>
+                ))}
               </div>
-            </div>
-
-            <div className="p-8 bg-slate-950 rounded-3xl border border-slate-800 shadow-2xl">
-              <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.5em] mb-8">Process Billing</p>
-              {getUnpaidMonths(selectedStudent.lastPaymentMonth).map(month => (
-                <button 
-                  key={month}
-                  disabled={isProcessing}
-                  onClick={() => handleProcessPayment(selectedStudent, month)}
-                  className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white p-6 rounded-2xl flex items-center justify-between font-black tracking-tighter transition-all shadow-xl shadow-blue-600/10 group relative overflow-hidden"
-                >
-                  <div className="relative z-10 flex flex-col items-start">
-                    <span className="text-xl md:text-2xl uppercase leading-none">{month} Installment</span>
-                    <span className="text-[9px] opacity-70 tracking-widest uppercase font-bold mt-1">Tuition Fees</span>
-                  </div>
-                  <div className="relative z-10 flex items-center gap-4">
-                    <span className="text-xl font-black tracking-tight">LKR 1,000</span>
-                    <CreditCard size={28} className="group-hover:translate-x-1 transition-transform"/>
-                  </div>
-                  <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                </button>
-              ))}
             </div>
           </div>
 
-          <div className="space-y-8 animate-in slide-in-from-right-8 duration-700">
+          <div className="space-y-8">
             {lastReceipt ? (
               <div className="bg-white text-slate-950 p-10 rounded-[3rem] shadow-3xl space-y-10 relative overflow-hidden animate-in zoom-in-95 duration-500">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-slate-50 rounded-bl-[6rem]"></div>
@@ -383,14 +372,14 @@ const PaymentDesk: React.FC = () => {
                       className="w-full bg-slate-950 text-white py-6 rounded-2xl flex items-center justify-center gap-5 font-black tracking-tighter hover:bg-slate-800 transition-all shadow-3xl uppercase text-lg disabled:opacity-50"
                     >
                       {isGenerating ? <Loader2 size={24} className="animate-spin" /> : <Printer size={28} />}
-                      View Receipt
+                      Display Receipt
                     </button>
                     <button 
                       onClick={undoLastPayment}
                       className="w-full bg-slate-100 text-rose-600 py-4 rounded-2xl flex items-center justify-center gap-3 font-black uppercase text-xs tracking-widest hover:bg-rose-50 transition-all"
                     >
                       <RotateCcw size={18} />
-                      Undo Last Payment
+                      Reverse Transaction
                     </button>
                   </div>
                 </div>
@@ -400,8 +389,8 @@ const PaymentDesk: React.FC = () => {
                 <div className="w-24 h-24 bg-slate-900/40 rounded-full flex items-center justify-center mb-10 border border-slate-800/50 shadow-inner">
                   <Printer size={48} className="opacity-20" />
                 </div>
-                <h4 className="text-2xl md:text-3xl font-black uppercase tracking-tighter italic opacity-60">Terminal Standby</h4>
-                <p className="font-bold uppercase text-[10px] tracking-[0.5em] opacity-30 mt-3">Identify student to access ledger</p>
+                <h4 className="text-2xl md:text-3xl font-black uppercase tracking-tighter italic opacity-60">Ledger Standby</h4>
+                <p className="font-bold uppercase text-[10px] tracking-[0.5em] opacity-30 mt-3">Identify student to access records</p>
               </div>
             )}
           </div>
@@ -413,18 +402,18 @@ const PaymentDesk: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6 backdrop-blur-3xl bg-slate-950/80">
           <div className="bg-slate-900 w-full max-w-xl p-8 rounded-[4rem] border border-slate-800 shadow-3xl overflow-hidden relative">
             <button 
-              onClick={() => { setIsScanning(false); stopScanner(); }}
+              onClick={stopScanner}
               className="absolute top-6 right-6 z-10 w-12 h-12 bg-slate-950 rounded-full flex items-center justify-center text-slate-700 hover:text-white transition-all shadow-2xl border border-slate-800"
             >
               <X size={28} />
             </button>
             <div className="text-center mb-10">
-              <h3 className="text-3xl font-black tracking-tighter uppercase italic leading-none">Optical Gate</h3>
-              <p className="text-slate-500 font-bold uppercase tracking-[0.5em] text-[10px] mt-2">Scan Student Identity Pass</p>
+              <h3 className="text-3xl font-black tracking-tighter uppercase italic leading-none text-white">Identity Gate</h3>
+              <p className="text-slate-500 font-bold uppercase tracking-[0.5em] text-[10px] mt-2">Scan Student Pass Key</p>
             </div>
             
-            <div className="relative rounded-[3rem] overflow-hidden border-4 md:border-8 border-slate-800 shadow-3xl">
-              <video ref={videoRef} className="w-full h-[400px] md:h-[500px] object-cover scale-x-[-1]" />
+            <div className="relative rounded-[3rem] overflow-hidden border-4 md:border-8 border-slate-800 shadow-3xl bg-black">
+              <video ref={videoRef} className="w-full h-[400px] md:h-[500px] object-cover scale-x-[-1]" playsInline />
               <canvas ref={canvasRef} className="hidden" />
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="w-64 h-64 md:w-80 md:h-80 border-2 md:border-4 border-blue-600/60 rounded-[3rem] animate-pulse shadow-[0_0_150px_rgba(37,99,235,0.3)]"></div>
@@ -432,10 +421,10 @@ const PaymentDesk: React.FC = () => {
             </div>
             
             <button 
-              onClick={() => { setIsScanning(false); stopScanner(); }}
+              onClick={stopScanner}
               className="w-full mt-10 bg-slate-800 text-white py-6 rounded-2xl font-black uppercase tracking-[0.3em] text-[10px] hover:bg-slate-700 transition-all border border-slate-700 shadow-xl"
             >
-              TERMINATE SCANNER
+              CANCEL OPERATION
             </button>
           </div>
         </div>
@@ -445,13 +434,13 @@ const PaymentDesk: React.FC = () => {
       {previewImage && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-xl animate-in fade-in duration-300">
           <div className="bg-slate-900 border border-slate-800 rounded-[3rem] p-8 md:p-12 max-w-lg w-full shadow-3xl relative overflow-hidden animate-in zoom-in-95 duration-500">
-            <button onClick={() => setPreviewImage(null)} className="absolute top-8 right-8 text-slate-500 hover:text-white transition-all z-10">
+            <button onClick={() => setPreviewImage(null)} className="absolute top-8 right-8 text-slate-500 hover:text-white transition-all z-20">
               <X size={32} />
             </button>
             
             <div className="text-center mb-10">
-              <h2 className="text-2xl font-black uppercase italic tracking-tighter mb-2">Billing Receipt</h2>
-              <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest">Digital Settlement Evidence</p>
+              <h2 className="text-2xl font-black uppercase italic tracking-tighter mb-2 text-white">Billing Evidence</h2>
+              <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest">Digital Settlement Pass</p>
             </div>
 
             <div className="flex justify-center mb-10 bg-white p-4 rounded-3xl overflow-hidden">
@@ -461,29 +450,29 @@ const PaymentDesk: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <button 
                 onClick={handlePrint}
-                className="bg-blue-600 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-3 shadow-xl shadow-blue-600/20 hover:bg-blue-500 transition-all uppercase tracking-widest text-[9px]"
+                className="bg-blue-600 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 shadow-xl shadow-blue-600/20 hover:bg-blue-500 transition-all uppercase tracking-widest text-[8px]"
               >
                 <Printer size={16} />
                 Print
               </button>
               <button 
                 onClick={handleShareWhatsApp}
-                className="bg-emerald-600 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-3 shadow-xl shadow-emerald-600/20 hover:bg-emerald-500 transition-all uppercase tracking-widest text-[9px]"
+                className="bg-emerald-600 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 shadow-xl shadow-emerald-600/20 hover:bg-emerald-500 transition-all uppercase tracking-widest text-[8px]"
               >
                 <MessageSquare size={16} />
                 WhatsApp
               </button>
               <a 
                 href={previewImage} 
-                download={`${selectedStudent?.name.replace(/\s+/g, '_')}_receipt_${lastReceipt?.month}.png`}
-                className="bg-slate-800 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-3 hover:bg-slate-700 transition-all uppercase tracking-widest text-[9px]"
+                download={`${selectedStudent?.name.replace(/\s+/g, '_')}_Receipt_${lastReceipt?.month}.png`}
+                className="bg-slate-800 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 hover:bg-slate-700 transition-all uppercase tracking-widest text-[8px]"
               >
                 <Download size={16} />
                 Download
               </a>
               <button 
                 onClick={() => setPreviewImage(null)}
-                className="bg-slate-950 text-slate-500 font-black py-4 rounded-2xl hover:text-white transition-all uppercase tracking-widest text-[9px] border border-slate-800"
+                className="bg-slate-950 text-slate-500 font-black py-4 rounded-2xl hover:text-white transition-all uppercase tracking-widest text-[8px] border border-slate-800"
               >
                 Close
               </button>

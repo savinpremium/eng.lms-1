@@ -19,8 +19,7 @@ const PaymentDesk: React.FC = () => {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const scannerLoopRef = useRef<number | null>(null);
+  const qrScannerRef = useRef<any>(null);
 
   useEffect(() => {
     return storageService.listenStudents(setStudents);
@@ -35,84 +34,48 @@ const PaymentDesk: React.FC = () => {
   }, [searchTerm, students]);
 
   const stopScanner = () => {
-    if (scannerLoopRef.current) {
-      cancelAnimationFrame(scannerLoopRef.current);
-      scannerLoopRef.current = null;
-    }
-    if (videoRef.current?.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach(track => track.stop());
-      videoRef.current.srcObject = null;
+    if (qrScannerRef.current) {
+      qrScannerRef.current.destroy();
+      qrScannerRef.current = null;
     }
     setIsScanning(false);
   };
 
-  const tick = () => {
-    if (videoRef.current && canvasRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d', { alpha: false, willReadFrequently: true });
-      if (ctx) {
-        const v = videoRef.current;
-        const w = 480; 
-        const h = (v.videoHeight / v.videoWidth) * w;
-        canvas.width = w;
-        canvas.height = h;
-        
-        ctx.drawImage(v, 0, 0, w, h);
-        const imageData = ctx.getImageData(0, 0, w, h);
-        const data = imageData.data;
-
-        // HIGH CONTRAST VISION PRE-PROCESS
-        for (let i = 0; i < data.length; i += 4) {
-          let gray = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
-          if (gray < 110) gray = gray * 0.4;
-          else if (gray > 150) gray = Math.min(255, gray * 1.3);
-          data[i] = data[i+1] = data[i+2] = gray;
-        }
-        
-        const jsQRFunc = (window as any).jsQR;
-        if (jsQRFunc) {
-          const code = jsQRFunc(data, w, h, { inversionAttempts: "attemptBoth" });
-          if (code && code.data) {
-            const raw = code.data.trim().toUpperCase();
-            const match = raw.match(/(STU-\d{4}-\d{4})/);
-            const foundId = match ? match[1] : (raw.startsWith('STU-') ? raw : null);
-            
-            if (foundId) {
-              const found = students.find(s => s.id.toUpperCase() === foundId);
-              if (found) {
-                setSelectedStudent(found);
-                audioService.playSuccess();
-                audioService.playTone(800, 'sine', 0.1);
-                stopScanner();
-                return;
-              }
-            }
-          }
-        }
-      }
-    }
-    if (isScanning) {
-      scannerLoopRef.current = requestAnimationFrame(tick);
-    }
-  };
-
   const startScanner = async () => {
     setIsScanning(true);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment', width: { ideal: 1280 } } 
-      });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.onloadedmetadata = () => {
-          videoRef.current?.play();
-          scannerLoopRef.current = requestAnimationFrame(tick);
-        };
+    const QrScanner = (window as any).QrScanner;
+    if (!QrScanner) return;
+
+    // Use small delay to ensure modal/video ref is ready
+    setTimeout(async () => {
+      if (!videoRef.current) return;
+      
+      qrScannerRef.current = new QrScanner(
+        videoRef.current,
+        (result: any) => {
+          const rawId = result.data.trim().toUpperCase();
+          const match = rawId.match(/(STU-\d{4}-\d{4})/);
+          const foundId = match ? match[1] : (rawId.startsWith('STU-') ? rawId : null);
+          
+          if (foundId) {
+            const found = students.find(s => s.id.toUpperCase() === foundId);
+            if (found) {
+              setSelectedStudent(found);
+              audioService.playSuccess();
+              stopScanner();
+            }
+          }
+        },
+        { preferredCamera: 'environment' }
+      );
+
+      try {
+        await qrScannerRef.current.start();
+      } catch (err) {
+        console.error("Scanner failed:", err);
+        setIsScanning(false);
       }
-    } catch (err) {
-      setIsScanning(false);
-    }
+    }, 100);
   };
 
   const handleProcessPayment = async (student: Student, month: string) => {
@@ -243,7 +206,7 @@ const PaymentDesk: React.FC = () => {
           />
           
           {searchTerm && filteredStudents.length > 0 && !selectedStudent && (
-            <div className="absolute top-full left-0 right-0 mt-4 bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-3xl z-50">
+            <div className="absolute top-full left-0 right-0 mt-4 bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-3xl z-50 overflow-hidden">
               {filteredStudents.map(s => (
                 <button key={s.id} onClick={() => { setSelectedStudent(s); setSearchTerm(''); }} className="w-full flex items-center justify-between p-4 hover:bg-slate-800 rounded-xl transition-all text-white">
                   <div className="text-left">
@@ -290,7 +253,7 @@ const PaymentDesk: React.FC = () => {
               <div className="p-8 bg-slate-950 rounded-3xl border border-slate-800">
                 <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.5em] mb-8">Pending Fees</p>
                 {getUnpaidMonths(selectedStudent.lastPaymentMonth).map(month => (
-                  <button key={month} disabled={isProcessing} onClick={() => handleProcessPayment(selectedStudent, month)} className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white p-6 rounded-2xl flex items-center justify-between font-black tracking-tighter transition-all">
+                  <button key={month} disabled={isProcessing} onClick={() => handleProcessPayment(selectedStudent, month)} className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white p-6 rounded-2xl flex items-center justify-between font-black tracking-tighter transition-all shadow-xl">
                     <div className="flex flex-col items-start">
                       <span className="text-xl md:text-2xl uppercase leading-none">{month} Fee</span>
                       <span className="text-[9px] opacity-70 uppercase font-bold mt-1">Monthly Contribution</span>
@@ -313,11 +276,11 @@ const PaymentDesk: React.FC = () => {
                   <h4 className="text-3xl font-black uppercase italic leading-none">Settled</h4>
                 </div>
                 <div className="flex flex-col gap-4 mt-8">
-                  <button onClick={sendDigitalUpdate} disabled={isSendingUpdate} className="w-full bg-emerald-600 text-white py-5 rounded-2xl flex items-center justify-center gap-4 font-black uppercase text-base">
+                  <button onClick={sendDigitalUpdate} disabled={isSendingUpdate} className="w-full bg-emerald-600 text-white py-5 rounded-2xl flex items-center justify-center gap-4 font-black uppercase text-base shadow-xl">
                     {isSendingUpdate ? <Loader2 className="animate-spin" /> : <Sparkles />}
                     Notify Parent via WA
                   </button>
-                  <button onClick={generateReceipt} disabled={isGenerating} className="w-full bg-slate-950 text-white py-5 rounded-2xl flex items-center justify-center gap-4 font-black uppercase text-base">
+                  <button onClick={generateReceipt} disabled={isGenerating} className="w-full bg-slate-950 text-white py-5 rounded-2xl flex items-center justify-center gap-4 font-black uppercase text-base shadow-xl">
                     {isGenerating ? <Loader2 className="animate-spin" /> : <Printer />}
                     Display Receipt
                   </button>
@@ -337,7 +300,7 @@ const PaymentDesk: React.FC = () => {
       {isScanning && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6 backdrop-blur-3xl bg-slate-950/80">
           <div className="bg-slate-900 w-full max-w-xl p-8 rounded-[4rem] border border-slate-800 shadow-3xl overflow-hidden relative animate-in zoom-in duration-300">
-            <button onClick={stopScanner} className="absolute top-6 right-6 z-10 w-12 h-12 bg-slate-950 rounded-full flex items-center justify-center text-slate-700 hover:text-white border border-slate-800">
+            <button onClick={stopScanner} className="absolute top-6 right-6 z-10 w-12 h-12 bg-slate-950 rounded-full flex items-center justify-center text-slate-700 hover:text-white border border-slate-800 transition-colors">
               <X size={28} />
             </button>
             <div className="text-center mb-10">
@@ -347,7 +310,6 @@ const PaymentDesk: React.FC = () => {
             
             <div className="relative rounded-[3rem] overflow-hidden border-8 border-slate-800 bg-black">
               <video ref={videoRef} className="w-full h-[400px] object-cover" playsInline />
-              <canvas ref={canvasRef} className="hidden" />
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="w-64 h-64 border-2 border-blue-600/60 rounded-[3rem] animate-pulse">
                    <div className="w-full h-1 bg-blue-500 absolute top-1/2 -translate-y-1/2 shadow-[0_0_15px_rgba(59,130,246,0.5)]" />
@@ -355,7 +317,7 @@ const PaymentDesk: React.FC = () => {
               </div>
             </div>
             
-            <button onClick={stopScanner} className="w-full mt-10 bg-slate-800 text-white py-6 rounded-2xl font-black uppercase tracking-[0.3em] text-[10px]">ABORT SCAN</button>
+            <button onClick={stopScanner} className="w-full mt-10 bg-slate-800 text-white py-6 rounded-2xl font-black uppercase tracking-[0.3em] text-[10px] transition-colors">ABORT SCAN</button>
           </div>
         </div>
       )}

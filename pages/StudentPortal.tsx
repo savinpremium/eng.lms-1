@@ -15,73 +15,49 @@ const StudentPortal: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [scanStatus, setScanStatus] = useState<'IDLE' | 'READ'>('IDLE');
 
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const loopRef = useRef<number | null>(null);
+  const qrScannerRef = useRef<any>(null);
 
   const startScanner = async () => {
     setIsScanning(true);
     setScanStatus('IDLE');
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-        loopRef.current = requestAnimationFrame(tick);
+    
+    const QrScanner = (window as any).QrScanner;
+    if (!QrScanner) return;
+
+    setTimeout(async () => {
+      if (!videoRef.current) return;
+      
+      qrScannerRef.current = new QrScanner(
+        videoRef.current,
+        (result: any) => {
+          const rawId = result.data.trim().toUpperCase();
+          const match = rawId.match(/(STU-\d{4}-\d{4})/);
+          const foundId = match ? match[1] : (rawId.startsWith('STU-') ? rawId : null);
+          
+          if (foundId) {
+            setScanStatus('READ');
+            audioService.playTone(800, 'sine', 0.1);
+            verifyId(foundId);
+            stopScanner();
+          }
+        },
+        { preferredCamera: 'user' }
+      );
+
+      try {
+        await qrScannerRef.current.start();
+      } catch (err) {
+        setIsScanning(false);
       }
-    } catch (err) {
-      setIsScanning(false);
-    }
+    }, 100);
   };
 
   const stopScanner = () => {
-    if (loopRef.current) cancelAnimationFrame(loopRef.current);
-    if (videoRef.current?.srcObject) {
-      (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
+    if (qrScannerRef.current) {
+      qrScannerRef.current.destroy();
+      qrScannerRef.current = null;
     }
     setIsScanning(false);
-  };
-
-  const tick = () => {
-    if (videoRef.current && canvasRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d', { alpha: false, willReadFrequently: true });
-      if (ctx) {
-        const v = videoRef.current;
-        const w = 400;
-        const h = (v.videoHeight / v.videoWidth) * w;
-        canvas.width = w;
-        canvas.height = h;
-        
-        ctx.drawImage(v, 0, 0, w, h);
-        const imageData = ctx.getImageData(0, 0, w, h);
-        const data = imageData.data;
-
-        // HIGH CONTRAST BINARIZATION FOR SELFIE CAM
-        for (let i = 0; i < data.length; i += 4) {
-          const luma = (data[i] * 0.3 + data[i + 1] * 0.59 + data[i + 2] * 0.11);
-          const bin = luma > 120 ? 255 : 0;
-          data[i] = data[i+1] = data[i+2] = bin;
-        }
-
-        if ((window as any).jsQR) {
-          const code = (window as any).jsQR(data, w, h, { inversionAttempts: "attemptBoth" });
-          if (code && code.data) {
-            const raw = code.data.trim().toUpperCase();
-            const match = raw.match(/(STU-\d{4}-\d{4})/);
-            const foundId = match ? match[1] : (raw.startsWith('STU-') ? raw : null);
-            
-            if (foundId) {
-              setScanStatus('READ');
-              audioService.playTone(800, 'sine', 0.1);
-              verifyId(foundId);
-              stopScanner();
-              return;
-            }
-          }
-        }
-      }
-    }
-    if (isScanning) loopRef.current = requestAnimationFrame(tick);
   };
 
   useEffect(() => {
@@ -237,7 +213,7 @@ const StudentPortal: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
       {isScanning && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6 backdrop-blur-3xl bg-slate-950/80">
-          <div className="bg-slate-900 w-full max-w-xl p-8 rounded-[4rem] border border-slate-800 shadow-3xl overflow-hidden relative">
+          <div className="bg-slate-900 w-full max-w-xl p-8 rounded-[4rem] border border-slate-800 shadow-3xl overflow-hidden relative animate-in zoom-in duration-300">
             <button onClick={stopScanner} className="absolute top-6 right-6 z-10 w-12 h-12 bg-slate-950 rounded-full flex items-center justify-center text-slate-700 hover:text-white border border-slate-800">
               <X size={28} />
             </button>
@@ -246,8 +222,7 @@ const StudentPortal: React.FC<{ onBack: () => void }> = ({ onBack }) => {
               <p className="text-slate-500 font-bold uppercase tracking-[0.5em] text-[10px] mt-2">Environment Neutral Capture</p>
             </div>
             <div className="relative rounded-[3rem] overflow-hidden border-8 border-slate-800 bg-black">
-              <video ref={videoRef} className="w-full h-[400px] object-cover scale-x-[-1]" playsInline />
-              <canvas ref={canvasRef} className="hidden" />
+              <video ref={videoRef} className="w-full h-[400px] object-cover" playsInline />
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className={`w-64 h-64 border-2 border-blue-600/60 rounded-[3rem] ${scanStatus === 'READ' ? 'bg-emerald-500/20 border-emerald-500' : 'animate-pulse'}`}>
                    {scanStatus === 'READ' && <Check size={48} className="text-emerald-500 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />}

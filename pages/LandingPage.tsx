@@ -3,8 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Page, Grade, Student } from '../types';
 import { storageService } from '../services/storageService';
 import { audioService } from '../services/audioService';
-import { toPng } from 'html-to-image';
-import { CheckCircle, ArrowRight, ShieldCheck, QrCode, Lock, Printer, UserCheck, Loader2, X, Download, MessageSquare, BookOpen } from 'lucide-react';
+import { CheckCircle, ArrowRight, ShieldCheck, Lock, UserCheck, Loader2, X, MessageSquare, BookOpen } from 'lucide-react';
 
 interface LandingPageProps {
   onNavigate: (page: Page) => void;
@@ -23,8 +22,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, onLoginSuccess })
   const [showManual, setShowManual] = useState(false);
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [loading, setLoading] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   useEffect(() => {
     const manualSeen = localStorage.getItem('englms_manual_seen');
@@ -60,75 +57,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, onLoginSuccess })
     audioService.playSuccess();
   };
 
-  const generateIDCard = async () => {
-    if (!registeredStudent) return;
-    setIsGenerating(true);
-    
-    const buffer = document.getElementById('render-buffer');
-    if (!buffer) return;
-
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${registeredStudent.id}`;
-
-    buffer.innerHTML = `
-      <div id="id-card-capture" style="width: 85.6mm; height: 53.98mm; padding: 0; font-family: 'Inter', sans-serif; color: white; background: #020617; border-radius: 12px; overflow: hidden; display: flex; position: relative; box-sizing: border-box;">
-        <div style="position: absolute; top: -15mm; right: -15mm; width: 45mm; height: 45mm; background: #2563eb; opacity: 0.2; border-radius: 50%;"></div>
-        <div style="flex: 0 0 34mm; background: white; display: flex; flex-direction: column; align-items: center; justify-content: center; border-right: 2px solid #1e293b; z-index: 10;">
-          <img src="${qrUrl}" style="width: 26mm; height: 26mm; margin-bottom: 2mm;" />
-          <div style="color: #020617; font-size: 7pt; font-weight: 900; letter-spacing: 1px; background: #f1f5f9; padding: 1mm 3mm; border-radius: 4px;">PASS KEY</div>
-        </div>
-        <div style="flex: 1; padding: 6mm 8mm; display: flex; flex-direction: column; justify-content: space-between; z-index: 10;">
-          <div>
-            <h1 style="font-size: 11pt; font-weight: 900; color: #3b82f6; margin: 0; text-transform: uppercase;">Excellence English</h1>
-            <p style="font-size: 5pt; letter-spacing: 1px; font-weight: 800; color: #64748b; margin: 0; text-transform: uppercase;">Student Network</p>
-          </div>
-          <div>
-            <h2 style="font-size: 13pt; font-weight: 900; margin: 0; color: #f8fafc; text-transform: uppercase; line-height: 1.1;">${registeredStudent.name}</h2>
-            <p style="font-size: 9pt; font-weight: 900; color: #3b82f6; margin: 0.5mm 0; font-family: monospace;">${registeredStudent.id}</p>
-          </div>
-          <div style="display: flex; gap: 6mm; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 2mm;">
-            <div>
-              <p style="font-size: 4pt; font-weight: 900; color: #475569; margin: 0; text-transform: uppercase;">Grade</p>
-              <p style="font-size: 8pt; font-weight: 900; margin: 0;">${registeredStudent.grade}</p>
-            </div>
-            <div>
-              <p style="font-size: 4pt; font-weight: 900; color: #475569; margin: 0; text-transform: uppercase;">Term</p>
-              <p style="font-size: 8pt; font-weight: 900; margin: 0; color: #10b981;">2025/26</p>
-            </div>
-          </div>
-        </div>
-        <div style="position: absolute; bottom: 0; left: 34mm; right: 0; height: 1.5mm; background: #2563eb;"></div>
-      </div>
-    `;
-
-    try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      const node = document.getElementById('id-card-capture');
-      if (node) {
-        const dataUrl = await toPng(node, { pixelRatio: 3, skipFonts: true, fontEmbedCSS: '' });
-        setPreviewImage(dataUrl);
-      }
-    } catch (err) {
-      console.error('Generation failed:', err);
-    } finally {
-      setIsGenerating(false);
-      buffer.innerHTML = '';
-    }
-  };
-
-  const handlePrint = () => {
-    if (!previewImage) return;
-    const printSection = document.getElementById('print-section');
-    if (!printSection) return;
-    printSection.innerHTML = `<img src="${previewImage}" style="width: 85.6mm; height: 53.98mm;" />`;
-    window.print();
-    printSection.innerHTML = '';
-  };
-
   const handleShareWhatsApp = () => {
     if (!registeredStudent) return;
     const phone = registeredStudent.contact.replace(/\D/g, '');
     const waPhone = phone.startsWith('0') ? '94' + phone.substring(1) : phone;
-    const text = encodeURIComponent(`Hello ${registeredStudent.parentName}, your child ${registeredStudent.name}'s Student ID card (${registeredStudent.id}) has been generated at Excellence English. Please download it from the portal or collect the physical card.`);
+    const text = encodeURIComponent(`Hello ${registeredStudent.parentName}, your child ${registeredStudent.name} is now registered at Excellence English. Assigned Student ID: ${registeredStudent.id}. Welcome!`);
     window.open(`https://wa.me/${waPhone}?text=${text}`, '_blank');
   };
 
@@ -172,7 +105,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, onLoginSuccess })
           
           <div className="flex justify-center lg:justify-start items-center gap-6 mt-8 grayscale opacity-30">
              <div className="flex flex-col items-center"><ShieldCheck size={24}/><span className="text-[8px] font-black mt-2 tracking-widest uppercase text-slate-400">SECURE</span></div>
-             <div className="flex flex-col items-center"><QrCode size={24}/><span className="text-[8px] font-black mt-2 tracking-widest uppercase text-slate-400">SMART</span></div>
              <div className="flex flex-col items-center"><UserCheck size={24}/><span className="text-[8px] font-black mt-2 tracking-widest uppercase text-slate-400">VERIFIED</span></div>
           </div>
         </div>
@@ -180,9 +112,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, onLoginSuccess })
         <div className="bg-slate-900/40 p-6 md:p-8 rounded-3xl border border-slate-800 shadow-2xl transition-all duration-500 animate-in zoom-in-95">
           {!registeredStudent ? (
             <form onSubmit={handleRegister} className="space-y-4 md:space-y-6">
-              <div className="mb-4">
-                <h2 className="text-2xl md:text-3xl font-black tracking-tight uppercase italic mb-1 text-white">Register Now</h2>
-                <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest">Start your academic journey today</p>
+              <div className="mb-4 text-white">
+                <h2 className="text-2xl md:text-3xl font-black tracking-tight uppercase italic mb-1">Enrollment</h2>
+                <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest">Join our academic network</p>
               </div>
               <div className="space-y-3">
                 <input required placeholder="Student Full Name" className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 focus:outline-none focus:border-blue-600 transition-all font-bold text-sm text-white" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
@@ -195,7 +127,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, onLoginSuccess })
                 <input required placeholder="Guardian Name" className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 focus:outline-none focus:border-blue-600 transition-all font-bold text-sm text-white" value={formData.parentName} onChange={(e) => setFormData({...formData, parentName: e.target.value})} />
               </div>
               <button disabled={loading} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-3 transition-all transform hover:scale-[1.01] shadow-xl shadow-blue-600/20 uppercase tracking-tighter text-lg">
-                {loading ? <Loader2 className="animate-spin" size={20}/> : 'PROCEED ENROLLMENT'}
+                {loading ? <Loader2 className="animate-spin" size={20}/> : 'SUBMIT ENROLLMENT'}
                 {!loading && <ArrowRight size={20} />}
               </button>
             </form>
@@ -204,30 +136,21 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, onLoginSuccess })
               <div className="w-16 h-16 md:w-20 md:h-20 bg-emerald-500/10 text-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-inner">
                 <CheckCircle size={40} />
               </div>
-              <h2 className="text-2xl font-black mb-1 tracking-tight uppercase italic text-white">Provisioned</h2>
-              <p className="text-slate-500 font-bold uppercase text-[9px] tracking-[0.4em] mb-10">Credentials Generated Successfully</p>
+              <h2 className="text-2xl font-black mb-1 tracking-tight uppercase italic text-white">Enrollment Successful</h2>
+              <p className="text-slate-500 font-bold uppercase text-[9px] tracking-[0.4em] mb-10">Assigned Student Identifier</p>
               
-              <div className="bg-slate-950 p-6 md:p-8 rounded-[2rem] border border-blue-900/30 mb-10 relative overflow-hidden group shadow-2xl">
-                <p className="text-[9px] tracking-[0.5em] font-black text-slate-600 mb-2 uppercase">Student ID</p>
-                <p className="text-4xl font-black text-blue-500 tracking-tighter mb-8">{registeredStudent.id}</p>
-                
-                <div className="bg-white p-4 rounded-2xl inline-block shadow-2xl">
-                  <img 
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${registeredStudent.id}`} 
-                    alt="QR" 
-                    className="w-24 h-24 md:w-32 md:h-32"
-                  />
-                </div>
+              <div className="bg-slate-950 p-10 rounded-[2rem] border border-blue-900/30 mb-10 shadow-2xl">
+                <p className="text-[9px] tracking-[0.5em] font-black text-slate-600 mb-2 uppercase">Personnel ID</p>
+                <p className="text-5xl font-black text-blue-500 tracking-tighter">{registeredStudent.id}</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <button 
-                  onClick={generateIDCard}
-                  disabled={isGenerating}
-                  className="w-full bg-blue-600 text-white font-black py-3 rounded-xl hover:bg-blue-500 transition-all flex items-center justify-center gap-2 shadow-lg uppercase text-[10px] tracking-widest disabled:opacity-70"
+                  onClick={handleShareWhatsApp}
+                  className="w-full bg-emerald-600 text-white font-black py-3 rounded-xl hover:bg-emerald-500 transition-all flex items-center justify-center gap-2 shadow-lg uppercase text-[10px] tracking-widest"
                 >
-                  {isGenerating ? <Loader2 className="animate-spin" size={14}/> : <Printer size={14} />}
-                  Print ID Card
+                  <MessageSquare size={14} />
+                  Notify WhatsApp
                 </button>
                 <button 
                   onClick={() => onNavigate(Page.PORTAL)}
@@ -236,48 +159,31 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, onLoginSuccess })
                   Student Portal
                 </button>
               </div>
-              <button onClick={() => setRegisteredStudent(null)} className="mt-8 text-slate-600 font-bold text-[9px] uppercase tracking-[0.4em] hover:text-white transition-all">Register Next Student</button>
+              <button onClick={() => setRegisteredStudent(null)} className="mt-8 text-slate-600 font-bold text-[9px] uppercase tracking-[0.4em] hover:text-white transition-all">Next Registration</button>
             </div>
           )}
         </div>
       </div>
 
-      {/* Manual Modal (Sinhala Formal) */}
       {showManual && (
-        <div 
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-6 backdrop-blur-3xl bg-slate-950/90 animate-in fade-in duration-500 overflow-y-auto"
-          onClick={closeManual}
-        >
-          <div 
-            className="bg-slate-900 w-full max-w-lg p-6 md:p-10 rounded-3xl border border-slate-800 shadow-3xl space-y-6 md:space-y-8 animate-in zoom-in duration-300 relative overflow-hidden my-auto max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-6 backdrop-blur-3xl bg-slate-950/90 animate-in fade-in duration-500 overflow-y-auto" onClick={closeManual}>
+          <div className="bg-slate-900 w-full max-w-lg p-6 md:p-10 rounded-3xl border border-slate-800 shadow-3xl space-y-6 md:space-y-8 animate-in zoom-in duration-300 relative overflow-hidden my-auto max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
             <div className="absolute top-0 right-0 p-6 md:p-10 opacity-5 pointer-events-none">
               <BookOpen size={160} />
             </div>
-            
-            <button 
-              onClick={closeManual}
-              className="absolute top-4 right-4 md:top-8 md:right-8 text-slate-500 hover:text-white transition-all z-10"
-            >
-              <X size={32} />
-            </button>
-
+            <button onClick={closeManual} className="absolute top-4 right-4 md:top-8 md:right-8 text-slate-500 hover:text-white transition-all z-10"><X size={32} /></button>
             <div className="text-center pt-4">
-              <div className="w-14 h-14 md:w-16 md:h-16 bg-blue-600/10 text-blue-500 rounded-2xl flex items-center justify-center mx-auto mb-4 md:mb-6 shadow-inner">
-                <BookOpen size={32} />
-              </div>
+              <div className="w-14 h-14 md:w-16 md:h-16 bg-blue-600/10 text-blue-500 rounded-2xl flex items-center justify-center mx-auto mb-4 md:mb-6 shadow-inner"><BookOpen size={32} /></div>
               <h4 className="text-2xl md:text-3xl font-black tracking-tighter uppercase italic text-white mb-2 leading-tight">ලියාපදිංචි වීමේ මාර්ගෝපදේශය</h4>
-              <p className="text-slate-500 font-bold uppercase text-[8px] md:text-[9px] tracking-widest leading-relaxed">පහත පියවරයන් නිවැරදිව අනුගමනය කරන්න</p>
+              <p className="text-slate-500 font-bold uppercase text-[8px] md:text-[9px] tracking-widest">පහත පියවරයන් නිවැරදිව අනුගමනය කරන්න</p>
             </div>
-
             <div className="space-y-4 md:space-y-6 relative z-10">
               {[
                 { step: '01', text: 'ශිෂ්‍යයාගේ සම්පූර්ණ නම ඉංග්‍රීසි අකුරින් පළමු කොටුවේ සටහන් කරන්න.' },
                 { step: '02', text: 'ශිෂ්‍යයා දැනට ඉගෙන ගන්නා ශ්‍රේණිය සහ ක්‍රියාකාරී වට්සැප් අංකය ඇතුළත් කරන්න.' },
                 { step: '03', text: 'භාරකරුගේ නම නිවැරදිව සටහන් කරන්න.' },
-                { step: '04', text: 'සියලු තොරතුරු සම්පූර්ණ කිරීමෙන් පසු "PROCEED ENROLLMENT" බොත්තම ඔබන්න.' },
-                { step: '05', text: 'ලැබෙන අනන්‍ය ශිෂ්‍ය අංකය සහ හැඳුනුම්පත අනාගත කටයුතු සඳහා සුරැකිව තබාගන්න.' }
+                { step: '04', text: 'සියලු තොරතුරු සම්පූර්ණ කිරීමෙන් පසු "SUBMIT ENROLLMENT" බොත්තම ඔබන්න.' },
+                { step: '05', text: 'ලැබෙන අනන්‍ය ශිෂ්‍ය අංකය අනාගත කටයුතු සඳහා සුරැකිව තබාගන්න.' }
               ].map((item, idx) => (
                 <div key={idx} className="flex gap-4 md:gap-6 items-start group">
                   <span className="text-xl md:text-2xl font-black text-blue-600 italic group-hover:scale-110 transition-transform flex-shrink-0">{item.step}</span>
@@ -285,79 +191,25 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, onLoginSuccess })
                 </div>
               ))}
             </div>
-
-            <button 
-              onClick={closeManual}
-              className="w-full bg-blue-600 hover:bg-blue-500 text-white py-4 md:py-5 rounded-2xl font-black uppercase tracking-tighter text-base md:text-lg shadow-xl shadow-blue-600/20 transition-all mt-6"
-            >
-              මා හට උපදෙස් අවබෝධ විය
-            </button>
+            <button onClick={closeManual} className="w-full bg-blue-600 hover:bg-blue-500 text-white py-4 md:py-5 rounded-2xl font-black uppercase tracking-tighter text-base md:text-lg shadow-xl shadow-blue-600/20 transition-all mt-6">මා හට උපදෙස් අවබෝධ විය</button>
           </div>
         </div>
       )}
 
-      {/* Login Modal */}
       {showLogin && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6 backdrop-blur-3xl bg-slate-950/80">
           <div className="bg-slate-900 w-full max-w-sm p-8 md:p-10 rounded-3xl border border-slate-800 shadow-3xl text-center space-y-6 animate-in zoom-in duration-300">
             <div className="w-16 h-16 bg-blue-600/10 text-blue-500 rounded-2xl flex items-center justify-center mx-auto shadow-inner"><Lock size={32} /></div>
             <div>
-              <h4 className="text-2xl font-black tracking-tighter uppercase italic mb-1 text-white">Staff Access</h4>
-              <p className="text-slate-500 font-bold uppercase text-[9px] tracking-widest">Authority Credentials Required</p>
+              <h4 className="text-2xl font-black tracking-tighter uppercase italic mb-1 text-white">Authority Login</h4>
+              <p className="text-slate-500 font-bold uppercase text-[9px] tracking-widest">Institutional Access Only</p>
             </div>
             <form onSubmit={handleLogin} className="space-y-3">
-              <input className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-6 py-4 focus:outline-none focus:border-blue-600 font-bold text-sm text-white" placeholder="Personnel ID" value={loginForm.username} onChange={(e) => setLoginForm({...loginForm, username: e.target.value})} />
-              <input type="password" autoFocus className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-6 py-4 focus:outline-none focus:border-blue-600 font-bold text-sm text-white" placeholder="Access Key" value={loginForm.password} onChange={(e) => setLoginForm({...loginForm, password: e.target.value})} />
-              <button className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black uppercase tracking-tighter text-lg shadow-xl shadow-blue-600/10 hover:bg-blue-500 transition-all mt-4">AUTHORIZE SESSION</button>
-              <button type="button" onClick={() => setShowLogin(false)} className="text-slate-600 font-bold uppercase text-[9px] tracking-widest mt-4 hover:text-white transition-all block w-full">CANCEL REQUEST</button>
+              <input className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-6 py-4 font-bold text-sm text-white" placeholder="Username" value={loginForm.username} onChange={(e) => setLoginForm({...loginForm, username: e.target.value})} />
+              <input type="password" autoFocus className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-6 py-4 font-bold text-sm text-white" placeholder="Access Key" value={loginForm.password} onChange={(e) => setLoginForm({...loginForm, password: e.target.value})} />
+              <button className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black uppercase tracking-tighter text-lg shadow-xl shadow-blue-600/10 hover:bg-blue-500 transition-all mt-4">VERIFY SESSION</button>
+              <button type="button" onClick={() => setShowLogin(false)} className="text-slate-600 font-bold uppercase text-[9px] tracking-widest mt-4 hover:text-white transition-all block w-full">CANCEL</button>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* ID Card Pop-up Preview */}
-      {previewImage && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-xl animate-in fade-in duration-300">
-          <div className="bg-slate-900 border border-slate-800 rounded-[2.5rem] p-8 md:p-12 max-w-2xl w-full shadow-3xl relative overflow-hidden animate-in zoom-in-95 duration-500">
-            <button onClick={() => setPreviewImage(null)} className="absolute top-8 right-8 text-slate-500 hover:text-white transition-all">
-              <X size={32} />
-            </button>
-            
-            <div className="text-center mb-10">
-              <h2 className="text-3xl font-black uppercase italic tracking-tighter mb-2 text-white">Student Pass</h2>
-              <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest">Verification ID Card 2025</p>
-            </div>
-
-            <div className="flex justify-center mb-12">
-              <div className="bg-slate-950 p-2 rounded-2xl border border-slate-800 shadow-2xl">
-                <img src={previewImage} className="w-full max-w-sm rounded-xl shadow-2xl" alt="ID Card Preview" />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <button 
-                onClick={handlePrint}
-                className="bg-blue-600 text-white font-black py-5 rounded-2xl flex items-center justify-center gap-3 shadow-xl shadow-blue-600/20 hover:bg-blue-500 transition-all uppercase tracking-widest text-xs"
-              >
-                <Printer size={20} />
-                Print Card
-              </button>
-              <button 
-                onClick={handleShareWhatsApp}
-                className="bg-emerald-600 text-white font-black py-5 rounded-2xl flex items-center justify-center gap-3 shadow-xl shadow-emerald-600/20 hover:bg-emerald-500 transition-all uppercase tracking-widest text-xs"
-              >
-                <MessageSquare size={20} />
-                WhatsApp
-              </button>
-              <a 
-                href={previewImage} 
-                download={`${registeredStudent?.id}_card.png`}
-                className="bg-slate-800 text-white font-black py-5 rounded-2xl flex items-center justify-center gap-3 hover:bg-slate-700 transition-all uppercase tracking-widest text-xs flex items-center justify-center"
-              >
-                <Download size={20} />
-                Download
-              </a>
-            </div>
           </div>
         </div>
       )}

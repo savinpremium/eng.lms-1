@@ -3,8 +3,7 @@ import React, { useState } from 'react';
 import { Grade, Student } from '../types';
 import { storageService } from '../services/storageService';
 import { audioService } from '../services/audioService';
-import { toPng } from 'html-to-image';
-import { UserPlus, ArrowRight, ShieldCheck, Info, Printer, CheckCircle, Loader2, X, Printer as PrinterIcon, Download, MessageSquare } from 'lucide-react';
+import { UserPlus, ArrowRight, ShieldCheck, Info, CheckCircle, Loader2, MessageSquare, QrCode } from 'lucide-react';
 
 const Enrollment: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
   const [formData, setFormData] = useState({
@@ -15,8 +14,6 @@ const Enrollment: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
   });
   const [loading, setLoading] = useState(false);
   const [successStudent, setSuccessStudent] = useState<Student | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,76 +39,11 @@ const Enrollment: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
     setSuccessStudent(newStudent);
   };
 
-  const generateIDCard = async () => {
-    if (!successStudent) return;
-    setIsGenerating(true);
-    
-    const buffer = document.getElementById('render-buffer');
-    if (!buffer) return;
-
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${successStudent.id}`;
-
-    buffer.innerHTML = `
-      <div id="enroll-id-to-capture" style="width: 85.6mm; height: 53.98mm; padding: 0; font-family: 'Inter', sans-serif; color: white; background: #020617; border-radius: 12px; overflow: hidden; display: flex; position: relative; box-sizing: border-box;">
-        <div style="position: absolute; top: -15mm; right: -15mm; width: 45mm; height: 45mm; background: #2563eb; opacity: 0.2; border-radius: 50%;"></div>
-        <div style="flex: 0 0 34mm; background: white; display: flex; flex-direction: column; align-items: center; justify-content: center; border-right: 2px solid #1e293b; z-index: 10;">
-          <img src="${qrUrl}" style="width: 26mm; height: 26mm; margin-bottom: 2mm;" />
-          <div style="color: #020617; font-size: 7pt; font-weight: 900; letter-spacing: 1px; background: #f1f5f9; padding: 1mm 3mm; border-radius: 4px;">PASS KEY</div>
-        </div>
-        <div style="flex: 1; padding: 6mm 8mm; display: flex; flex-direction: column; justify-content: space-between; z-index: 10;">
-          <div>
-            <h1 style="font-size: 11pt; font-weight: 900; color: #3b82f6; margin: 0; text-transform: uppercase; line-height: 1;">Excellence English</h1>
-            <p style="font-size: 5pt; letter-spacing: 2px; font-weight: 800; color: #64748b; margin: 0; text-transform: uppercase;">Professional Network</p>
-          </div>
-          <div style="margin: 1.5mm 0;">
-            <p style="font-size: 4.5pt; font-weight: 900; color: #3b82f6; margin: 0; text-transform: uppercase; letter-spacing: 0.5px;">Institutional Identity</p>
-            <h2 style="font-size: 14pt; font-weight: 900; margin: 0.5mm 0; color: #f8fafc; text-transform: uppercase; letter-spacing: -0.5px;">${successStudent.name}</h2>
-            <p style="font-size: 10pt; font-weight: 900; color: #3b82f6; margin: 0.5mm 0; font-family: monospace; letter-spacing: 1px;">${successStudent.id}</p>
-          </div>
-          <div style="display: flex; gap: 6mm;">
-            <div>
-              <p style="font-size: 4pt; font-weight: 900; color: #475569; margin: 0; text-transform: uppercase;">Grade</p>
-              <p style="font-size: 8pt; font-weight: 900; margin: 0;">${successStudent.grade}</p>
-            </div>
-            <div>
-              <p style="font-size: 4pt; font-weight: 900; color: #475569; margin: 0; text-transform: uppercase;">Status</p>
-              <p style="font-size: 8pt; font-weight: 900; margin: 0; color: #10b981;">ACTIVE</p>
-            </div>
-          </div>
-        </div>
-        <div style="position: absolute; bottom: 0; left: 34mm; right: 0; height: 1.5mm; background: #2563eb;"></div>
-      </div>
-    `;
-
-    try {
-      await new Promise(resolve => setTimeout(resolve, 800));
-      const node = document.getElementById('enroll-id-to-capture');
-      if (node) {
-        const dataUrl = await toPng(node, { pixelRatio: 3, skipFonts: true, fontEmbedCSS: '' });
-        setPreviewImage(dataUrl);
-      }
-    } catch (error) {
-      console.error('ID capture failed:', error);
-    } finally {
-      buffer.innerHTML = '';
-      setIsGenerating(false);
-    }
-  };
-
-  const handlePrintActual = () => {
-    if (!previewImage) return;
-    const printSection = document.getElementById('print-section');
-    if (!printSection) return;
-    printSection.innerHTML = `<img src="${previewImage}" style="width: 85.6mm; height: 53.98mm;" />`;
-    window.print();
-    printSection.innerHTML = '';
-  };
-
   const handleShareWhatsApp = () => {
     if (!successStudent) return;
     const phone = successStudent.contact.replace(/\D/g, '');
     const waPhone = phone.startsWith('0') ? '94' + phone.substring(1) : phone;
-    const text = encodeURIComponent(`Hello ${successStudent.parentName}, your child ${successStudent.name}'s Student ID card (${successStudent.id}) has been generated at Excellence English.`);
+    const text = encodeURIComponent(`Hello ${successStudent.parentName}, your child ${successStudent.name} is successfully enrolled at Excellence English. Student ID: ${successStudent.id}.`);
     window.open(`https://wa.me/${waPhone}?text=${text}`, '_blank');
   };
 
@@ -125,76 +57,46 @@ const Enrollment: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
             <CheckCircle size={56} />
           </div>
           <div>
-            <h2 className="text-3xl md:text-5xl font-black tracking-tighter uppercase italic mb-4 leading-none">Enrollment Verified</h2>
-            <p className="text-slate-400 font-bold max-w-md mx-auto text-base md:text-lg leading-relaxed">Student <b>{successStudent.name}</b> has been successfully provisioned with ID <b>{successStudent.id}</b>.</p>
+            <h2 className="text-3xl md:text-5xl font-black tracking-tighter uppercase italic mb-4 leading-none text-white">Registry Updated</h2>
+            <p className="text-slate-400 font-bold max-w-md mx-auto text-base md:text-lg leading-relaxed">Student <b>{successStudent.name}</b> has been provisioned.</p>
+          </div>
+
+          <div className="flex flex-col md:flex-row items-center justify-center gap-10 bg-slate-950 p-12 rounded-[2.5rem] border border-blue-900/30 shadow-2xl">
+             <div className="bg-white p-4 rounded-3xl shadow-xl">
+               <img 
+                 src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${successStudent.id}`} 
+                 alt="ID QR" 
+                 className="w-32 h-32"
+               />
+             </div>
+             <div className="text-left">
+               <p className="text-[10px] font-black tracking-[0.5em] text-slate-600 uppercase mb-2">Institutional Pass Key</p>
+               <p className="text-5xl font-black text-blue-500 tracking-tighter mb-4">{successStudent.id}</p>
+               <div className="flex items-center gap-2 text-emerald-500 text-[10px] font-black uppercase tracking-widest">
+                 <ShieldCheck size={14} />
+                 Cryptographic ID Active
+               </div>
+             </div>
           </div>
 
           <div className="flex flex-col md:flex-row gap-4 justify-center">
             <button 
-              onClick={generateIDCard}
-              disabled={isGenerating}
-              className="bg-blue-600 hover:bg-blue-500 text-white px-10 py-5 rounded-2xl font-black flex items-center justify-center gap-4 transition-all shadow-xl uppercase tracking-widest text-xs disabled:opacity-70"
+              onClick={handleShareWhatsApp}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white px-10 py-5 rounded-2xl font-black flex items-center justify-center gap-4 transition-all shadow-xl uppercase tracking-widest text-xs"
             >
-              {isGenerating ? <Loader2 className="animate-spin" size={20} /> : <Printer size={20} />}
-              View ID Card
+              <MessageSquare size={20} />
+              WhatsApp Notification
             </button>
             <button 
               onClick={onComplete}
               className="bg-slate-800 hover:bg-slate-700 text-white px-10 py-5 rounded-2xl font-black flex items-center justify-center gap-4 transition-all uppercase tracking-widest text-xs"
             >
-              Go to Registry
+              Back to Registry
             </button>
           </div>
           
-          <button onClick={() => setSuccessStudent(null)} className="text-slate-600 font-bold uppercase text-[9px] tracking-[0.5em] hover:text-white transition-all">Enroll Subsequent Student</button>
+          <button onClick={() => setSuccessStudent(null)} className="text-slate-600 font-bold uppercase text-[9px] tracking-[0.5em] hover:text-white transition-all">Next Enrollment</button>
         </div>
-
-        {/* ID Card Pop-up Preview */}
-        {previewImage && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-xl animate-in fade-in duration-300">
-            <div className="bg-slate-900 border border-slate-800 rounded-[2.5rem] p-8 md:p-12 max-w-2xl w-full shadow-3xl relative overflow-hidden animate-in zoom-in-95 duration-500">
-              <button onClick={() => setPreviewImage(null)} className="absolute top-8 right-8 text-slate-500 hover:text-white transition-all">
-                <X size={32} />
-              </button>
-              
-              <div className="text-center mb-10">
-                <h2 className="text-3xl font-black uppercase italic tracking-tighter mb-2">Institutional Pass</h2>
-                <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest">Enrollment Success Evidence</p>
-              </div>
-
-              <div className="flex justify-center mb-12">
-                <div className="bg-slate-950 p-2 rounded-2xl border border-slate-800 shadow-2xl">
-                  <img src={previewImage} className="w-full max-w-sm rounded-xl shadow-2xl" alt="ID Card Preview" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <button 
-                  onClick={handlePrintActual}
-                  className="bg-blue-600 text-white font-black py-5 rounded-2xl flex items-center justify-center gap-3 shadow-xl shadow-blue-600/20 hover:bg-blue-500 transition-all uppercase tracking-widest text-xs"
-                >
-                  <PrinterIcon size={20} />
-                  Print Card
-                </button>
-                <button 
-                  onClick={handleShareWhatsApp}
-                  className="bg-emerald-600 text-white font-black py-5 rounded-2xl flex items-center justify-center gap-3 shadow-xl shadow-emerald-600/20 hover:bg-emerald-500 transition-all uppercase tracking-widest text-xs"
-                >
-                  <MessageSquare size={20} />
-                  WhatsApp
-                </button>
-                <a 
-                  href={previewImage} 
-                  download={`${successStudent?.id}_card.png`}
-                  className="bg-slate-800 text-white font-black py-5 rounded-2xl flex items-center justify-center gap-3 hover:bg-slate-700 transition-all uppercase tracking-widest text-xs"
-                >
-                  <Download size={20} />
-                  Download
-                </a>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     );
   }
@@ -203,8 +105,8 @@ const Enrollment: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
     <div className="max-w-4xl mx-auto space-y-10 md:space-y-12 pb-20">
       <header className="flex justify-between items-end animate-in fade-in slide-in-from-top-4 duration-500">
         <div>
-          <h1 className="text-4xl md:text-6xl font-black tracking-tighter uppercase italic leading-none">Register Now</h1>
-          <p className="text-slate-500 font-bold uppercase tracking-[0.6em] text-[10px] mt-3">Student Provisioning Station</p>
+          <h1 className="text-4xl md:text-6xl font-black tracking-tighter uppercase italic leading-none text-white">Enrollment</h1>
+          <p className="text-slate-500 font-bold uppercase tracking-[0.6em] text-[10px] mt-3">Institutional Provisioning Desk</p>
         </div>
         <div className="hidden lg:flex items-center gap-6 text-slate-800 opacity-20">
            <ShieldCheck size={56} />
@@ -213,22 +115,22 @@ const Enrollment: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 md:gap-10 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-100">
-        <div className="lg:col-span-2 bg-slate-900/50 p-8 md:p-12 rounded-[2.5rem] md:rounded-[3.5rem] border border-slate-800 shadow-3xl">
+        <div className="lg:col-span-2 bg-slate-900/50 p-8 md:p-12 rounded-[2.5rem] md:rounded-[3.5rem] border border-slate-800 shadow-3xl text-white">
           <form onSubmit={handleSubmit} className="space-y-8 md:space-y-10">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10">
               <div className="space-y-3">
-                <label className="block text-xs font-black tracking-[0.5em] uppercase text-slate-600">Student Full Name</label>
+                <label className="block text-xs font-black tracking-[0.5em] uppercase text-slate-600">Student Name</label>
                 <input 
                   required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl md:rounded-2xl px-6 py-4 md:py-6 focus:border-blue-600 focus:outline-none font-bold text-lg md:text-xl shadow-inner transition-all"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl md:rounded-2xl px-6 py-4 md:py-6 focus:border-blue-600 focus:outline-none font-bold text-lg md:text-xl shadow-inner transition-all text-white"
                   value={formData.name}
                   onChange={e => setFormData({...formData, name: e.target.value})}
                 />
               </div>
               <div className="space-y-3">
-                <label className="block text-xs font-black tracking-[0.5em] uppercase text-slate-600">Academic Level</label>
+                <label className="block text-xs font-black tracking-[0.5em] uppercase text-slate-600">Grade Level</label>
                 <select 
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl md:rounded-2xl px-6 py-4 md:py-6 focus:border-blue-600 focus:outline-none appearance-none font-bold text-lg md:text-xl shadow-inner transition-all"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl md:rounded-2xl px-6 py-4 md:py-6 focus:border-blue-600 focus:outline-none appearance-none font-bold text-lg md:text-xl shadow-inner transition-all text-white"
                   value={formData.grade}
                   onChange={e => setFormData({...formData, grade: e.target.value as Grade})}
                 >
@@ -239,20 +141,20 @@ const Enrollment: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10">
               <div className="space-y-3">
-                <label className="block text-xs font-black tracking-[0.5em] uppercase text-slate-600">WhatsApp Contact</label>
+                <label className="block text-xs font-black tracking-[0.5em] uppercase text-slate-600">Contact Number</label>
                 <input 
                   required
                   placeholder="07XXXXXXXX"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl md:rounded-2xl px-6 py-4 md:py-6 focus:border-blue-600 focus:outline-none font-bold text-lg md:text-xl shadow-inner transition-all"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl md:rounded-2xl px-6 py-4 md:py-6 focus:border-blue-600 focus:outline-none font-bold text-lg md:text-xl shadow-inner transition-all text-white"
                   value={formData.contact}
                   onChange={e => setFormData({...formData, contact: e.target.value})}
                 />
               </div>
               <div className="space-y-3">
-                <label className="block text-xs font-black tracking-[0.5em] uppercase text-slate-600">Parent / Guardian</label>
+                <label className="block text-xs font-black tracking-[0.5em] uppercase text-slate-600">Guardian Name</label>
                 <input 
                   required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl md:rounded-2xl px-6 py-4 md:py-6 focus:border-blue-600 focus:outline-none font-bold text-lg md:text-xl shadow-inner transition-all"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl md:rounded-2xl px-6 py-4 md:py-6 focus:border-blue-600 focus:outline-none font-bold text-lg md:text-xl shadow-inner transition-all text-white"
                   value={formData.parentName}
                   onChange={e => setFormData({...formData, parentName: e.target.value})}
                 />
@@ -263,7 +165,7 @@ const Enrollment: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
               disabled={loading}
               className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-6 md:py-8 rounded-2xl md:rounded-[3rem] flex items-center justify-center gap-4 md:gap-5 transition-all transform hover:scale-[1.01] shadow-2xl shadow-blue-600/30 uppercase tracking-tighter text-xl md:text-2xl"
             >
-              {loading ? "PROVISIONING..." : "CONFIRM ENROLLMENT"}
+              {loading ? "PROCESSING..." : "REGISTER PERSONNEL"}
               {!loading && <ArrowRight size={28} />}
             </button>
           </form>
@@ -275,19 +177,19 @@ const Enrollment: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
             <div className="w-14 h-14 bg-blue-600/10 text-blue-500 rounded-xl md:rounded-[1.8rem] flex items-center justify-center mb-6 md:mb-10 shadow-inner">
               <ShieldCheck size={36} />
             </div>
-            <h4 className="text-xl md:text-2xl font-black uppercase tracking-tight mb-3 md:mb-4 italic">Security Link</h4>
-            <p className="text-slate-500 text-xs md:text-sm font-bold leading-relaxed">Enrollment data is anchored to the institutional pass system for zero-collision gate authorization.</p>
+            <h4 className="text-xl md:text-2xl font-black uppercase tracking-tight mb-3 md:mb-4 italic text-white">Security Record</h4>
+            <p className="text-slate-500 text-xs md:text-sm font-bold leading-relaxed">Enrollment data is assigned a permanent identifier for institutional record tracking and billing.</p>
           </div>
 
           <div className="bg-slate-950 p-8 md:p-12 rounded-[2rem] md:rounded-[3rem] border border-slate-900 shadow-3xl">
             <div className="flex items-center gap-4 text-emerald-500 mb-6 md:mb-8">
               <Info size={24} />
-              <h4 className="font-black text-xs uppercase tracking-[0.4em]">Protocols</h4>
+              <h4 className="font-black text-xs uppercase tracking-[0.4em]">Desk Policies</h4>
             </div>
             <ul className="space-y-4 text-xs font-black text-slate-500 uppercase tracking-widest leading-relaxed">
-              <li className="flex gap-4"><span className="text-blue-600 font-black">01</span> Card printer linked</li>
-              <li className="flex gap-4"><span className="text-blue-600 font-black">02</span> AI drafts authorized</li>
-              <li className="flex gap-4"><span className="text-blue-600 font-black">03</span> Database sync active</li>
+              <li className="flex gap-4"><span className="text-blue-600 font-black">01</span> ID assignment instant</li>
+              <li className="flex gap-4"><span className="text-blue-600 font-black">02</span> Parent notification sent</li>
+              <li className="flex gap-4"><span className="text-blue-600 font-black">03</span> Ledger updated auto</li>
             </ul>
           </div>
         </div>

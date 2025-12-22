@@ -33,6 +33,15 @@
         background: #334155;
       }
 
+      /* Image Generation Buffer */
+      #render-buffer {
+        position: fixed;
+        left: -9999px;
+        top: -9999px;
+        visibility: visible;
+        pointer-events: none;
+      }
+
       @media print {
         body * {
           visibility: hidden;
@@ -41,17 +50,17 @@
           visibility: visible;
         }
         #print-section {
-          position: fixed;
+          position: absolute;
           left: 0;
           top: 0;
           width: 100%;
-          height: 100%;
           display: flex;
+          justify-content: center;
           align-items: flex-start;
-          justify-content: flex-start;
-          margin: 0;
-          padding: 0;
           background: white;
+        }
+        @page {
+          margin: 0;
         }
       }
     </style>
@@ -68,13 +77,16 @@
     "firebase/app": "https://www.gstatic.com/firebasejs/11.3.1/firebase-app.js",
     "firebase/database": "https://www.gstatic.com/firebasejs/11.3.1/firebase-database.js",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "firebase/": "https://esm.sh/firebase@^12.7.0/"
+    "firebase/": "https://esm.sh/firebase@^12.7.0/",
+    "html-to-image": "https://esm.sh/html-to-image@^1.11.11"
   }
 }
 </script>
   </head>
   <body>
     <div id="root"></div>
+    <!-- Buffer for generating high-quality images -->
+    <div id="render-buffer"></div>
     <div id="print-section"></div>
     <!-- Load the entry point module -->
     <script type="module" src="index.tsx"></script>

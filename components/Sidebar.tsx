@@ -27,13 +27,13 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate, onLogout, isDemo }) => {
   const menuItems = [
     { page: Page.DASHBOARD, icon: LayoutDashboard, label: 'Dashboard', staffOnly: true },
+    { page: Page.PAYMENTS, icon: CreditCard, label: 'Payments', staffOnly: false },
     { page: Page.ENROLLMENT, icon: UserPlus, label: 'Register', staffOnly: true },
     { page: Page.STUDENTS, icon: Users, label: 'Student List', staffOnly: true },
     { page: Page.ATTENDANCE, icon: ScanQrCode, label: 'Attendance', staffOnly: false },
     { page: Page.CLASS_ATTENDANCE, icon: BookOpenCheck, label: 'Monthly Register', staffOnly: true },
-    { page: Page.PAYMENTS, icon: CreditCard, label: 'Payments', staffOnly: false },
     { page: Page.GROUPS, icon: Layers, label: 'Class Groups', staffOnly: true },
-    { page: Page.MESSENGER, icon: MessageSquare, label: 'AI Message Gen', staffOnly: true },
+    { page: Page.MESSENGER, icon: MessageSquare, label: 'Ai Message Gen', staffOnly: true },
     { page: Page.EXAMS, icon: GraduationCap, label: 'Assessments', staffOnly: true },
     { page: Page.MATERIALS, icon: LibraryBig, label: 'Study Hub', staffOnly: true },
     { page: Page.COMM_HUB, icon: History, label: 'Audit Log', staffOnly: true },

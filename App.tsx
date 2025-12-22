@@ -13,7 +13,6 @@ import Enrollment from './pages/Enrollment';
 import StudentResults from './pages/StudentResults';
 import LearningMaterials from './pages/LearningMaterials';
 import CommLogs from './pages/CommLogs';
-import ScheduleDesk from './pages/ScheduleDesk';
 import ClassGroups from './pages/ClassGroups';
 import Sidebar from './components/Sidebar';
 import { storageService } from './services/storageService';
@@ -46,7 +45,6 @@ const App: React.FC = () => {
       Page.EXAMS,
       Page.MATERIALS,
       Page.COMM_HUB,
-      Page.SCHEDULE,
       Page.GROUPS
     ];
 
@@ -99,7 +97,6 @@ const App: React.FC = () => {
     Page.EXAMS,
     Page.MATERIALS,
     Page.COMM_HUB,
-    Page.SCHEDULE,
     Page.GROUPS
   ].includes(currentPage) && auth.isStaff;
 
@@ -129,8 +126,6 @@ const App: React.FC = () => {
         return <LearningMaterials />;
       case Page.COMM_HUB:
         return <CommLogs />;
-      case Page.SCHEDULE:
-        return <ScheduleDesk />;
       case Page.GROUPS:
         return <ClassGroups />;
       default:

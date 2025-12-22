@@ -97,6 +97,5 @@ export enum Page {
   EXAMS = 'EXAMS',
   MATERIALS = 'MATERIALS',
   COMM_HUB = 'COMM_HUB',
-  SCHEDULE = 'SCHEDULE',
   GROUPS = 'GROUPS'
 }

@@ -36,37 +36,43 @@ const StudentRegistry: React.FC<{ onNavigate: (page: Page) => void }> = ({ onNav
     if (!buffer) return;
 
     buffer.innerHTML = `
-      <div id="pvc-card-target" style="width: 324px; height: 204px; background: white; color: white; border-radius: 16px; position: relative; overflow: hidden; font-family: 'Inter', sans-serif; display: flex;">
-        <div style="flex: 0 0 128px; background: white; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px;">
-          <div style="width: 100px; height: 100px; padding: 4px; background: white;">
-             <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${student.id}" style="width: 100%; height: 100%;" />
+      <div id="pvc-card-target" style="width: 324px; height: 204px; background: white; border-radius: 12px; position: relative; overflow: hidden; font-family: 'Inter', sans-serif; display: flex; flex-direction: column; border: 1px solid #e2e8f0; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);">
+        <!-- Top Bar -->
+        <div style="background: #020617; padding: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+          <div style="font-size: 14px; font-weight: 900; color: white; text-transform: uppercase; letter-spacing: 2px;">EXCELLENCE ENGLISH</div>
+          <div style="font-size: 6px; font-weight: 700; color: #3b82f6; text-transform: uppercase; letter-spacing: 3px; margin-top: 2px;">INSTITUTIONAL PASSPORT</div>
+        </div>
+
+        <!-- Main Content -->
+        <div style="flex: 1; display: flex; padding: 16px; gap: 16px;">
+          <!-- QR Section -->
+          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;">
+            <div style="padding: 4px; border: 1px solid #f1f5f9; background: white;">
+              <img src="https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${student.id}" style="width: 80px; height: 80px;" />
+            </div>
+            <div style="font-size: 8px; font-weight: 900; color: #020617; background: #f1f5f9; padding: 2px 8px; border-radius: 4px; letter-spacing: 1px;">${student.id}</div>
           </div>
-          <div style="margin-top: 12px; background: #f1f5f9; color: #020617; padding: 6px 14px; border-radius: 6px; font-size: 10px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase;">
-            PASS KEY
+
+          <!-- Student Info Section -->
+          <div style="flex: 1; display: flex; flex-direction: column; justify-content: center;">
+            <div style="font-size: 6px; font-weight: 900; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px;">STUDENT NAME</div>
+            <div style="font-size: 16px; font-weight: 900; color: #020617; text-transform: uppercase; line-height: 1.1; margin-bottom: 8px;">${student.name}</div>
+            
+            <div style="display: flex; gap: 16px;">
+              <div>
+                <div style="font-size: 6px; font-weight: 900; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px;">LEVEL</div>
+                <div style="font-size: 10px; font-weight: 900; color: #2563eb;">${student.grade}</div>
+              </div>
+              <div>
+                <div style="font-size: 6px; font-weight: 900; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px;">JOINED</div>
+                <div style="font-size: 10px; font-weight: 900; color: #020617;">2025</div>
+              </div>
+            </div>
           </div>
         </div>
-        <div style="flex: 1; background: #020617; padding: 20px; position: relative; display: flex; flex-direction: column; justify-content: space-between;">
-          <div>
-            <div style="font-size: 16px; font-weight: 900; color: #3b82f6; text-transform: uppercase;">EXCELLENCE</div>
-            <div style="font-size: 16px; font-weight: 900; color: #3b82f6; text-transform: uppercase;">ENGLISH</div>
-          </div>
-          <div>
-            <div style="font-size: 7px; font-weight: 900; color: #3b82f6; text-transform: uppercase; margin-bottom: 4px;">INSTITUTIONAL IDENTITY</div>
-            <div style="font-size: 18px; font-weight: 900; color: white; text-transform: uppercase;">${student.name}</div>
-            <div style="font-size: 14px; font-weight: 900; color: #3b82f6; margin-top: 6px;">${student.id}</div>
-          </div>
-          <div style="display: flex; gap: 24px;">
-            <div>
-              <div style="font-size: 6px; font-weight: 900; color: #475569; text-transform: uppercase;">GRADE</div>
-              <div style="font-size: 11px; font-weight: 900; color: white;">${student.grade.replace('Grade ', '')}</div>
-            </div>
-            <div>
-              <div style="font-size: 6px; font-weight: 900; color: #475569; text-transform: uppercase;">STATUS</div>
-              <div style="font-size: 11px; font-weight: 900; color: #10b981;">VERIFIED</div>
-            </div>
-          </div>
-          <div style="position: absolute; bottom: 0; left: 0; right: 0; height: 8px; background: #2563eb;"></div>
-        </div>
+
+        <!-- Footer Accent -->
+        <div style="height: 6px; background: linear-gradient(90deg, #2563eb 0%, #3b82f6 100%);"></div>
       </div>
     `;
 

@@ -1,7 +1,7 @@
 
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, set, get, push, update, onValue, child, remove } from "firebase/database";
-import { Student, AttendanceRecord, PaymentRecord, ResultRecord, MaterialRecord } from '../types';
+import { Student, AttendanceRecord, PaymentRecord, ResultRecord, MaterialRecord, MessageLog, ScheduleRecord } from '../types';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDneDiUzFALG_DcH1gNJmzB0WIddQcDxsA",
@@ -119,6 +119,48 @@ export const storageService = {
 
   deletePayment: async (id: string) => {
     await remove(ref(db, `payments/${id}`));
+  },
+
+  // Message Logs
+  logMessage: async (log: MessageLog) => {
+    const logRef = push(ref(db, 'message_logs'));
+    await set(logRef, { ...log, id: logRef.key });
+  },
+
+  listenLogs: (callback: (logs: MessageLog[]) => void) => {
+    const logRef = ref(db, 'message_logs');
+    return onValue(logRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = Object.values(snapshot.val()) as MessageLog[];
+        callback(data.sort((a, b) => b.timestamp - a.timestamp));
+      } else {
+        callback([]);
+      }
+    });
+  },
+
+  // Schedules
+  getSchedules: async (): Promise<ScheduleRecord[]> => {
+    const snapshot = await get(ref(db, 'schedules'));
+    if (snapshot.exists()) return Object.values(snapshot.val());
+    return [];
+  },
+
+  listenSchedules: (callback: (records: ScheduleRecord[]) => void) => {
+    const schRef = ref(db, 'schedules');
+    return onValue(schRef, (snapshot) => {
+      if (snapshot.exists()) callback(Object.values(snapshot.val()));
+      else callback([]);
+    });
+  },
+
+  saveSchedule: async (sch: ScheduleRecord) => {
+    const schRef = sch.id ? ref(db, `schedules/${sch.id}`) : push(ref(db, 'schedules'));
+    await set(schRef, { ...sch, id: schRef.key });
+  },
+
+  deleteSchedule: async (id: string) => {
+    await remove(ref(db, `schedules/${id}`));
   },
 
   // Assessment Results

@@ -2,6 +2,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { storageService } from '../services/storageService';
 import { audioService } from '../services/audioService';
+import { smsService } from '../services/smsService';
 import { Student, PaymentRecord } from '../types';
 import { toPng } from 'html-to-image';
 import { Search, Printer, CreditCard, ChevronRight, User, Hash, ScanQrCode, X, CheckCircle, Loader2, RotateCcw, Download, MessageSquare } from 'lucide-react';
@@ -55,7 +56,6 @@ const PaymentDesk: React.FC = () => {
         ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         
-        // Use jsQR from window scope
         if ((window as any).jsQR) {
           const code = (window as any).jsQR(imageData.data, imageData.width, imageData.height, {
             inversionAttempts: "dontInvert",
@@ -104,7 +104,7 @@ const PaymentDesk: React.FC = () => {
     setIsProcessing(true);
 
     const payment: PaymentRecord = {
-      id: '', // Set by push key
+      id: '', 
       studentId: student.id,
       amount: 1000, 
       month,
@@ -117,6 +117,10 @@ const PaymentDesk: React.FC = () => {
       const updatedStudent = { ...student, lastPaymentMonth: month };
       await storageService.updateStudent(updatedStudent);
       
+      // AUTO SMS CONFIRMATION
+      const msg = `Excellence English: Tuition fees for ${month} received for ${student.name}. Receipt ID: ${id}. Thank you. ස්තුතියි.`;
+      smsService.sendSMS(student, msg, 'Payment');
+
       setSelectedStudent(updatedStudent);
       setLastReceipt({ ...payment, id });
       audioService.playCash();

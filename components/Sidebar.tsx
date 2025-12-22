@@ -12,7 +12,9 @@ import {
   UserPlus,
   BookOpenCheck,
   GraduationCap,
-  LibraryBig
+  LibraryBig,
+  CalendarDays,
+  History
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -28,10 +30,12 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate, onLogout }) =
     { page: Page.ENROLLMENT, icon: UserPlus, label: 'Enrollment' },
     { page: Page.ATTENDANCE, icon: ScanQrCode, label: 'QR Gate' },
     { page: Page.CLASS_ATTENDANCE, icon: BookOpenCheck, label: 'Class Register' },
+    { page: Page.SCHEDULE, icon: CalendarDays, label: 'Schedule' },
     { page: Page.EXAMS, icon: GraduationCap, label: 'Assessment' },
     { page: Page.MATERIALS, icon: LibraryBig, label: 'Study Hub' },
     { page: Page.PAYMENTS, icon: CreditCard, label: 'Payments' },
     { page: Page.MESSENGER, icon: MessageSquare, label: 'AI Messenger' },
+    { page: Page.COMM_HUB, icon: History, label: 'Comm Audit' },
   ];
 
   return (

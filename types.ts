@@ -49,6 +49,24 @@ export interface MaterialRecord {
   date: string;
 }
 
+export interface MessageLog {
+  id: string;
+  studentId: string;
+  type: 'SMS' | 'WhatsApp';
+  category: 'Attendance' | 'Payment' | 'Reminder' | 'Announcement';
+  content: string;
+  status: 'Sent' | 'Failed';
+  timestamp: number;
+}
+
+export interface ScheduleRecord {
+  id: string;
+  grade: Grade;
+  day: 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday';
+  time: string; // HH:MM
+  venue: string;
+}
+
 export interface AuthState {
   isStaff: boolean;
   staffId: string | null;
@@ -67,5 +85,7 @@ export enum Page {
   MESSENGER = 'MESSENGER',
   ENROLLMENT = 'ENROLLMENT',
   EXAMS = 'EXAMS',
-  MATERIALS = 'MATERIALS'
+  MATERIALS = 'MATERIALS',
+  COMM_HUB = 'COMM_HUB',
+  SCHEDULE = 'SCHEDULE'
 }

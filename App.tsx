@@ -12,6 +12,8 @@ import AIMessenger from './pages/AIMessenger';
 import Enrollment from './pages/Enrollment';
 import StudentResults from './pages/StudentResults';
 import LearningMaterials from './pages/LearningMaterials';
+import CommLogs from './pages/CommLogs';
+import ScheduleDesk from './pages/ScheduleDesk';
 import Sidebar from './components/Sidebar';
 import { storageService } from './services/storageService';
 import { Wifi, WifiOff } from 'lucide-react';
@@ -40,7 +42,9 @@ const App: React.FC = () => {
       Page.MESSENGER,
       Page.ENROLLMENT,
       Page.EXAMS,
-      Page.MATERIALS
+      Page.MATERIALS,
+      Page.COMM_HUB,
+      Page.SCHEDULE
     ];
     if (staffPages.includes(page) && !auth.isStaff) {
       setCurrentPage(Page.LANDING);
@@ -69,7 +73,9 @@ const App: React.FC = () => {
     Page.MESSENGER,
     Page.ENROLLMENT,
     Page.EXAMS,
-    Page.MATERIALS
+    Page.MATERIALS,
+    Page.COMM_HUB,
+    Page.SCHEDULE
   ].includes(currentPage) && auth.isStaff;
 
   const renderPage = () => {
@@ -96,6 +102,10 @@ const App: React.FC = () => {
         return <StudentResults />;
       case Page.MATERIALS:
         return <LearningMaterials />;
+      case Page.COMM_HUB:
+        return <CommLogs />;
+      case Page.SCHEDULE:
+        return <ScheduleDesk />;
       default:
         return <LandingPage onNavigate={navigate} onLoginSuccess={handleLoginSuccess} />;
     }

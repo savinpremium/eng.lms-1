@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { storageService } from '../services/storageService';
 import { audioService } from '../services/audioService';
+import { smsService } from '../services/smsService';
 import { ShieldCheck, AlertCircle, Scan, History, Camera, AlertTriangle, UserCheck, RotateCcw, Check, X, Bell } from 'lucide-react';
 import { Student } from '../types';
 
@@ -108,13 +109,18 @@ const AttendanceGate: React.FC = () => {
         return;
       }
 
-      // MARK ATTENDANCE ALWAYS (Fulfilling the request for marking even if unpaid)
+      // MARK ATTENDANCE
       const entryId = await storageService.addAttendance({
         id: '',
         studentId,
         date: today,
         timestamp: Date.now()
       });
+
+      // AUTO SMS ALERT to parent
+      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const msg = `Excellence English: ${student.name} has arrived at the institute at ${timeStr}. Attendance marked. ස්තුතියි.`;
+      smsService.sendSMS(student, msg, 'Attendance');
 
       setLastStudent(student);
       setLastEntryId(entryId);
@@ -127,7 +133,6 @@ const AttendanceGate: React.FC = () => {
         showNotification(`Attendance Recorded: ${student.name}`, 'success');
         setTimeout(() => setStatus('IDLE'), 2000);
       } else {
-        // GRACE PERIOD LOGIC: Allow for 24 hours (today)
         setStatus('GRACE');
         audioService.playWarning();
         const utterance = new SpeechSynthesisUtterance(`Grace Period authorized for ${student.name}. Please settle fees soon.`);
@@ -157,7 +162,6 @@ const AttendanceGate: React.FC = () => {
 
   return (
     <div className="max-w-5xl mx-auto space-y-12 pb-20 relative">
-      {/* Staff Notification Toast */}
       {notification && (
         <div className={`fixed top-10 left-1/2 -translate-x-1/2 z-[100] px-8 py-5 rounded-[2rem] border shadow-2xl flex items-center gap-4 animate-in slide-in-from-top-10 duration-500 ${
           notification.type === 'success' ? 'bg-emerald-600 border-emerald-500 text-white' :
@@ -243,7 +247,7 @@ const AttendanceGate: React.FC = () => {
                 <p className="text-5xl font-black tracking-tighter mb-3 text-white uppercase italic leading-none">{lastStudent.name}</p>
                 <div className="flex items-center gap-3 text-emerald-500 font-black text-xs uppercase tracking-[0.3em] mb-8">
                    <div className={`w-2.5 h-2.5 rounded-full animate-pulse ${status === 'GRACE' ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]' : 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]'}`} />
-                   Identity Marked Successfully
+                   Identity Marked & SMS Sent
                 </div>
                 <button 
                   onClick={undoLastEntry}

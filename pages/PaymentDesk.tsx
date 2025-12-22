@@ -18,9 +18,7 @@ const PaymentDesk: React.FC = () => {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
 
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const requestRef = useRef<number | null>(null);
+  const scannerRef = useRef<any>(null);
 
   useEffect(() => {
     return storageService.listenStudents(setStudents);
@@ -34,62 +32,39 @@ const PaymentDesk: React.FC = () => {
     );
   }, [searchTerm, students]);
 
-  const tick = () => {
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    
-    if (video && canvas && video.readyState === video.HAVE_ENOUGH_DATA) {
-      if (video.videoWidth > 0 && video.videoHeight > 0) {
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        if (ctx) {
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          
-          const jsQR = (window as any).jsQR;
-          if (typeof jsQR === 'function') {
-            const code = jsQR(imageData.data, imageData.width, imageData.height);
-            if (code && code.data) {
-              const student = students.find(s => s.id.toUpperCase() === code.data.trim().toUpperCase());
-              if (student) {
-                setSelectedStudent(student);
-                audioService.playSuccess();
-                stopScanner();
-                return;
-              }
-            }
-          }
-        }
-      }
-    }
-    requestRef.current = requestAnimationFrame(tick);
-  };
-
   const startScanner = async () => {
     setIsScanning(true);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' } 
-      });
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.setAttribute("playsinline", "true");
-        await videoRef.current.play();
-        requestRef.current = requestAnimationFrame(tick);
+    // Give DOM time to mount #qr-reader-payment
+    setTimeout(async () => {
+      try {
+        const Html5Qrcode = (window as any).Html5Qrcode;
+        if (!Html5Qrcode) return;
+
+        scannerRef.current = new Html5Qrcode("qr-reader-payment");
+        await scannerRef.current.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          (decodedText: string) => {
+            const student = students.find(s => s.id.toUpperCase() === decodedText.trim().toUpperCase());
+            if (student) {
+              setSelectedStudent(student);
+              audioService.playSuccess();
+              stopScanner();
+            }
+          },
+          () => {} // silent search errors
+        );
+      } catch (e) {
+        console.error("Scanner Error:", e);
+        alert("Scanner Error: Camera access required for optical scanning.");
+        setIsScanning(false);
       }
-    } catch (e) {
-      console.error("Scanner Error:", e);
-      alert("Scanner Error: Camera access required for optical scanning.");
-      setIsScanning(false);
-    }
+    }, 100);
   };
 
-  const stopScanner = () => {
-    if (requestRef.current) cancelAnimationFrame(requestRef.current);
-    if (videoRef.current?.srcObject) {
-      (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
+  const stopScanner = async () => {
+    if (scannerRef.current && scannerRef.current.isScanning) {
+      await scannerRef.current.stop();
     }
     setIsScanning(false);
   };
@@ -317,12 +292,8 @@ const PaymentDesk: React.FC = () => {
           <div className="bg-slate-900 border border-slate-800 rounded-[3rem] p-8 w-full max-w-xl relative">
             <button onClick={stopScanner} className="absolute top-6 right-6 text-slate-500 hover:text-white transition-all"><X size={32}/></button>
             <h3 className="text-2xl font-black uppercase italic mb-8">Pass Key Scanner</h3>
-            <div className="relative rounded-3xl overflow-hidden bg-black aspect-video border-4 border-slate-800">
-              <video ref={videoRef} className="w-full h-full object-cover" playsInline muted autoPlay />
-              <canvas ref={canvasRef} className="hidden" />
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-64 h-64 border-2 border-blue-500/30 rounded-3xl animate-pulse"></div>
-              </div>
+            <div className="relative rounded-3xl overflow-hidden bg-black aspect-video border-4 border-slate-800 min-h-[300px]">
+              <div id="qr-reader-payment" className="w-full h-full"></div>
             </div>
             <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500 mt-6 text-center">Align Student QR with frame</p>
           </div>

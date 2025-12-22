@@ -13,14 +13,11 @@ const AttendanceGate: React.FC = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
-  const [isScanning, setIsScanning] = useState(false);
+  const [isScannerActive, setIsScannerActive] = useState(false);
 
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const requestRef = useRef<number | null>(null);
+  const scannerRef = useRef<any>(null);
   const statusRef = useRef(status);
 
-  // Keep ref in sync for the tick loop
   useEffect(() => {
     statusRef.current = status;
   }, [status]);
@@ -33,74 +30,64 @@ const AttendanceGate: React.FC = () => {
     return () => unsub();
   }, []);
 
-  const tick = () => {
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    
-    if (video && canvas && video.readyState === video.HAVE_ENOUGH_DATA) {
-      if (video.videoWidth > 0 && video.videoHeight > 0) {
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        if (ctx) {
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          
-          // Access jsQR from global scope
-          const jsQR = (window as any).jsQR;
-          
-          if (typeof jsQR === 'function') {
-            const code = jsQR(imageData.data, imageData.width, imageData.height, {
-              inversionAttempts: "attemptBoth",
-            });
+  const startScanner = async () => {
+    if (!isDataLoaded) return;
+    setCameraError(null);
 
-            if (code && code.data && statusRef.current === 'IDLE') {
-              handleScan(code.data);
-            }
-          }
-        }
+    try {
+      // Use Html5Qrcode from global scope
+      const Html5Qrcode = (window as any).Html5Qrcode;
+      if (!Html5Qrcode) {
+        setCameraError("Scanner library not loaded.");
+        return;
       }
+
+      scannerRef.current = new Html5Qrcode("qr-reader-attendance");
+      
+      const config = { 
+        fps: 10, 
+        qrbox: { width: 300, height: 300 },
+        aspectRatio: 1.0
+      };
+
+      await scannerRef.current.start(
+        { facingMode: "environment" },
+        config,
+        (decodedText: string) => {
+          if (statusRef.current === 'IDLE') {
+            handleScan(decodedText);
+          }
+        },
+        (errorMessage: string) => {
+          // Normal behavior: silent while searching
+        }
+      );
+      
+      setIsScannerActive(true);
+    } catch (err) {
+      console.error("Scanner Error:", err);
+      setCameraError("Camera permission denied or camera not found.");
     }
-    requestRef.current = requestAnimationFrame(tick);
   };
 
-  const startScanner = async () => {
-    setCameraError(null);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
-          facingMode: 'environment',
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        } 
-      });
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.setAttribute("playsinline", "true"); // required to tell iOS safari we don't want fullscreen
-        await videoRef.current.play();
-        setIsScanning(true);
-        requestRef.current = requestAnimationFrame(tick);
-      }
-    } catch (err) {
-      console.error("Camera error:", err);
-      setCameraError("Camera access denied or unavailable. Please ensure permissions are granted.");
+  const stopScanner = async () => {
+    if (scannerRef.current && scannerRef.current.isScanning) {
+      await scannerRef.current.stop();
+      setIsScannerActive(false);
     }
   };
 
   useEffect(() => {
-    startScanner();
+    if (isDataLoaded) {
+      startScanner();
+    }
     return () => {
-      if (requestRef.current) cancelAnimationFrame(requestRef.current);
-      if (videoRef.current?.srcObject) {
-        (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
-      }
+      stopScanner();
     };
-  }, []);
+  }, [isDataLoaded]);
 
   const handleScan = async (studentId: string) => {
-    if (statusRef.current !== 'IDLE' || !isDataLoaded) return;
+    if (statusRef.current !== 'IDLE') return;
     
     const cleanId = studentId.trim().toUpperCase();
     const student = students.find(s => s.id.toUpperCase() === cleanId);
@@ -197,28 +184,11 @@ const AttendanceGate: React.FC = () => {
             </div>
           ) : (
             <div className="relative w-full h-[550px] bg-black">
-              <video 
-                ref={videoRef} 
-                className="w-full h-full object-cover" 
-                playsInline 
-                muted 
-                autoPlay
-              />
-              <canvas ref={canvasRef} className="hidden" />
-              
-              {/* Vision Reticle */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className={`w-72 h-72 border-2 rounded-[3rem] transition-all duration-500 ${status === 'IDLE' ? 'border-blue-500/50 scale-100' : 'border-transparent scale-110 opacity-0'}`}>
-                   <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-blue-500 rounded-tl-2xl"></div>
-                   <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-blue-500 rounded-tr-2xl"></div>
-                   <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-blue-500 rounded-bl-2xl"></div>
-                   <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-blue-500 rounded-br-2xl"></div>
-                   <div className="w-full h-0.5 bg-blue-500/20 absolute top-1/2 -translate-y-1/2 animate-pulse"></div>
-                </div>
-              </div>
+              {/* HTML5 QR Code Mount point */}
+              <div id="qr-reader-attendance" className="w-full h-full"></div>
 
-              {!isScanning && (
-                <div className="absolute inset-0 bg-slate-900 flex flex-col items-center justify-center gap-4">
+              {!isScannerActive && (
+                <div className="absolute inset-0 bg-slate-900 flex flex-col items-center justify-center gap-4 z-10">
                   <Loader2 className="animate-spin text-blue-500" size={48} />
                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Initializing Optical Input...</p>
                 </div>

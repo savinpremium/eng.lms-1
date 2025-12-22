@@ -97,7 +97,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     <div className="space-y-12 pb-20">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8 animate-in fade-in slide-in-from-top-4 duration-500">
         <div>
-          <h1 className="text-6xl font-black tracking-tighter uppercase italic leading-none text-white">Monitor Station</h1>
+          <h1 className="text-6xl font-black tracking-tighter uppercase italic leading-none text-white">Dashboard</h1>
           <p className="text-slate-500 font-bold uppercase text-[10px] tracking-[0.5em] mt-3">Welcome to Excellence English Hub</p>
         </div>
         
@@ -131,7 +131,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           >
             <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-white/5 rounded-full group-hover:scale-125 transition-transform duration-1000"></div>
             <div className="relative z-10 text-left">
-              <p className="text-4xl font-black tracking-tighter uppercase italic text-white leading-none mb-2">QR Gate</p>
+              <p className="text-4xl font-black tracking-tighter uppercase italic text-white leading-none mb-2">Attendance</p>
               <p className="text-[9px] font-black uppercase tracking-widest text-emerald-100/60">Mark Attendance</p>
             </div>
             <ArrowRight size={48} className="text-white relative z-10 group-hover:translate-x-3 transition-transform" />
@@ -143,7 +143,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           >
             <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-white/5 rounded-full group-hover:scale-125 transition-transform duration-1000"></div>
             <div className="relative z-10 text-left">
-              <p className="text-4xl font-black tracking-tighter uppercase italic text-white leading-none mb-2">Class Fees</p>
+              <p className="text-4xl font-black tracking-tighter uppercase italic text-white leading-none mb-2">Payments</p>
               <p className="text-[9px] font-black uppercase tracking-widest text-blue-100/60">Settle Monthly Dues</p>
             </div>
             <ArrowRight size={48} className="text-white relative z-10 group-hover:translate-x-3 transition-transform" />

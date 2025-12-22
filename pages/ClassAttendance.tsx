@@ -20,7 +20,7 @@ const ClassAttendance: React.FC = () => {
     };
   }, []);
 
-  const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+  const currentMonth = new Date().toISOString().slice(0, 7); 
 
   const grades: Grade[] = ['Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11'];
 
@@ -43,25 +43,16 @@ const ClassAttendance: React.FC = () => {
     const today = new Date().toISOString().split('T')[0];
     const isPaid = student.lastPaymentMonth >= currentMonth;
     
-    // Check Duplicate Marking
     const alreadyMarked = attendance.some(a => a.studentId === student.id && a.date === today);
     if (alreadyMarked) {
-      alert("Attendance already logged for today.");
+      alert("Attendance already logged.");
       return;
     }
 
-    // Grace Period Warning
-    if (!isPaid) {
-      if (!confirm(`GRACE PERIOD WARNING: Student ${student.name} is unpaid for ${currentMonth}. Proceed with marking attendance for today?`)) {
-        return;
-      }
-    } else {
-      if (!confirm(`Mark manual attendance for ${student.name} today?`)) {
-        return;
-      }
+    if (!confirm(`Mark manual attendance for ${student.name} today?`)) {
+      return;
     }
 
-    // Log Attendance
     await storageService.addAttendance({
       id: '',
       studentId: student.id,
@@ -80,13 +71,13 @@ const ClassAttendance: React.FC = () => {
     <div className="space-y-12 pb-20">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8 animate-in fade-in slide-in-from-top-4 duration-500">
         <div>
-          <h1 className="text-6xl font-black tracking-tighter uppercase italic leading-none text-white">Class Register</h1>
-          <p className="text-slate-500 font-bold uppercase text-[10px] tracking-[0.5em] mt-3">Personnel Tracking Protocol (Grace Period Support)</p>
+          <h1 className="text-6xl font-black tracking-tighter uppercase italic leading-none text-white">Monthly Register</h1>
+          <p className="text-slate-500 font-bold uppercase text-[10px] tracking-[0.5em] mt-3">Batch Tracking Protocol</p>
         </div>
         <div className="relative w-full md:w-80">
           <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-500" size={20} />
           <input 
-            placeholder="FILTER STUDENTS..."
+            placeholder="Filter Personnel..."
             className="w-full bg-slate-900 border border-slate-800 rounded-2xl pl-14 pr-6 py-4 font-black focus:outline-none focus:border-blue-600 transition-all text-xs uppercase tracking-tight"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -102,18 +93,18 @@ const ClassAttendance: React.FC = () => {
           const isExpanded = expandedGrade === grade;
 
           return (
-            <div key={grade} className="bg-slate-900/30 border border-slate-800/50 rounded-[2.5rem] overflow-hidden transition-all shadow-xl">
+            <div key={grade} className="bg-slate-900/30 border border-slate-800/50 rounded-[2.5rem] overflow-hidden shadow-xl">
               <button 
                 onClick={() => setExpandedGrade(isExpanded ? null : grade)}
                 className="w-full p-8 flex items-center justify-between hover:bg-slate-800/30 transition-all group"
               >
                 <div className="flex items-center gap-6">
-                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner transition-colors ${studentsInGrade.length > 0 ? 'bg-blue-600/10 text-blue-500' : 'bg-slate-950 text-slate-700'}`}>
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner ${studentsInGrade.length > 0 ? 'bg-blue-600/10 text-blue-500' : 'bg-slate-950 text-slate-700'}`}>
                     <Users size={28} />
                   </div>
                   <div className="text-left">
                     <h3 className="text-2xl font-black uppercase italic tracking-tighter text-white">{grade}</h3>
-                    <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">{studentsInGrade.length} Registered Personnel</p>
+                    <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">{studentsInGrade.length} Registry Entries</p>
                   </div>
                 </div>
                 {isExpanded ? <ChevronUp size={24} className="text-slate-600" /> : <ChevronDown size={24} className="text-slate-600" />}
@@ -125,9 +116,9 @@ const ClassAttendance: React.FC = () => {
                     <table className="w-full text-left border-collapse">
                       <thead className="bg-slate-900/50 border-b border-slate-800">
                         <tr>
-                          <th className="p-5 text-[9px] font-black tracking-[0.3em] uppercase text-slate-500">Student Identity</th>
-                          <th className="p-5 text-[9px] font-black tracking-[0.3em] uppercase text-slate-500 text-center">Month Progress ({new Date().toLocaleString('default', { month: 'long' })})</th>
-                          <th className="p-5 text-[9px] font-black tracking-[0.3em] uppercase text-slate-500 text-right">Gate Action</th>
+                          <th className="p-5 text-[9px] font-black tracking-[0.3em] uppercase text-slate-500">Personnel</th>
+                          <th className="p-5 text-[9px] font-black tracking-[0.3em] uppercase text-slate-500 text-center">Session Progress</th>
+                          <th className="p-5 text-[9px] font-black tracking-[0.3em] uppercase text-slate-500 text-right">Action</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-800/50">
@@ -144,7 +135,7 @@ const ClassAttendance: React.FC = () => {
                                     <p className={`font-black text-sm uppercase tracking-tight ${isUnpaid ? 'text-amber-500' : 'text-slate-200'}`}>{s.name}</p>
                                     {isUnpaid && (
                                       <div className="flex items-center gap-1 bg-amber-500/10 text-amber-500 px-2 py-0.5 rounded-full text-[7px] font-black tracking-widest uppercase border border-amber-500/20">
-                                        <AlertCircle size={8} /> GRACE ELIGIBLE
+                                        <AlertCircle size={8} /> OVERDUE
                                       </div>
                                     )}
                                   </div>
@@ -156,11 +147,10 @@ const ClassAttendance: React.FC = () => {
                                   {[1, 2, 3, 4].map(idx => (
                                     <div key={idx} className="relative group/week">
                                       {idx <= count ? (
-                                        <CheckCircle2 size={22} className="text-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.2)]" />
+                                        <CheckCircle2 size={22} className="text-emerald-500" />
                                       ) : (
                                         <Circle size={22} className="text-slate-800" />
                                       )}
-                                      <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-[7px] font-black uppercase text-slate-700 opacity-0 group-hover/week:opacity-100 transition-opacity whitespace-nowrap">Session {idx}</span>
                                     </div>
                                   ))}
                                 </div>
@@ -175,7 +165,7 @@ const ClassAttendance: React.FC = () => {
                                   }`}
                                 >
                                   <MousePointerClick size={14} />
-                                  Mark Attended
+                                  Log Attendance
                                 </button>
                               </td>
                             </tr>

@@ -5,7 +5,7 @@ import { audioService } from '../services/audioService';
 import { generateWhatsAppDraft } from '../services/geminiService';
 import { Student, PaymentRecord } from '../types';
 import { toPng } from 'html-to-image';
-import { Search, Printer, CreditCard, ChevronRight, User, Hash, X, CheckCircle, Loader2, Sparkles, Zap, ScanQrCode, Camera, Image as ImageIcon, ShieldAlert, Info } from 'lucide-react';
+import { Search, Printer, CreditCard, ChevronRight, User, Hash, X, CheckCircle, Loader2, Sparkles, Zap, ScanQrCode, Camera, Image as ImageIcon, Info } from 'lucide-react';
 
 const PaymentDesk: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -37,7 +37,7 @@ const PaymentDesk: React.FC = () => {
     let active = true;
     if (isScannerActive && isScannerModalOpen) {
       const initScanner = async () => {
-        await new Promise(r => setTimeout(r, 300)); // Longer wait for modal
+        await new Promise(r => setTimeout(r, 400));
         if (!active) return;
 
         try {
@@ -45,22 +45,18 @@ const PaymentDesk: React.FC = () => {
           if (!Html5Qrcode) return;
 
           const element = document.getElementById("qr-reader-payment");
-          if (!element) {
-            setScannerError("Mount point missing.");
-            return;
-          }
+          if (!element) return;
 
           scannerRef.current = new Html5Qrcode("qr-reader-payment");
           await scannerRef.current.start(
             { facingMode: "environment" },
             { 
-              fps: 20, 
+              fps: 30, 
               qrbox: (w: number, h: number) => {
-                const min = Math.min(w, h);
-                const s = Math.floor(min * 0.7);
-                return { width: s, height: s };
+                const size = Math.min(w, h) * 0.7;
+                return { width: size, height: size };
               },
-              aspectRatio: undefined 
+              aspectRatio: 1.0 
             },
             (decodedText: string) => {
               const student = students.find(s => s.id.toUpperCase() === decodedText.trim().toUpperCase());
@@ -74,7 +70,7 @@ const PaymentDesk: React.FC = () => {
         } catch (e: any) {
           console.error("Scanner Error:", e);
           if (active) {
-            setScannerError(e.name === 'NotAllowedError' ? "Permission denied." : "Hardware restricted.");
+            setScannerError("Hardware restricted.");
             setIsScannerActive(false);
           }
         }
@@ -105,9 +101,8 @@ const PaymentDesk: React.FC = () => {
   };
 
   const startScanner = async () => {
-    setScannerError(null);
     if (!isSecure && window.location.hostname !== 'localhost') {
-      setScannerError("Secure context (HTTPS) required for live video.");
+      setScannerError("HTTPS required.");
       return;
     }
     setIsScannerActive(true);
@@ -132,7 +127,7 @@ const PaymentDesk: React.FC = () => {
       }
     } catch (err) {
       console.error("File Scan Error:", err);
-      alert("No QR detected. Please ensure the code is clear and retry.");
+      alert("No QR detected.");
     } finally {
       setIsDecodingFile(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -173,7 +168,7 @@ const PaymentDesk: React.FC = () => {
       setLastReceipt({ ...payment, id });
       audioService.playCash();
     } catch (e) {
-      console.error("Ledger sync failed", e);
+      console.error("Ledger error", e);
     } finally {
       setIsProcessing(false);
     }
@@ -195,7 +190,7 @@ const PaymentDesk: React.FC = () => {
 
   const undoLastPayment = async () => {
     if (!lastReceipt || !selectedStudent) return;
-    if (!confirm("Reverse this ledger entry?")) return;
+    if (!confirm("Void this transaction?")) return;
 
     await storageService.deletePayment(lastReceipt.id);
     const [year, month] = lastReceipt.month.split('-').map(Number);
@@ -249,20 +244,13 @@ const PaymentDesk: React.FC = () => {
     }
   };
 
-  const getUnpaidMonths = (lastPaid: string) => {
-    const [year, month] = lastPaid.split('-').map(Number);
-    const nextMonth = month === 12 ? 1 : month + 1;
-    const nextYear = month === 12 ? year + 1 : year;
-    return [`${nextYear}-${nextMonth.toString().padStart(2, '0')}`];
-  };
-
   return (
     <div className="space-y-6 md:space-y-12 pb-20">
       <header className="flex justify-between items-center animate-in fade-in duration-500">
         <div>
-          <h1 className="text-3xl md:text-5xl font-black tracking-tighter uppercase italic text-white">Payment Desk</h1>
+          <h1 className="text-3xl md:text-5xl font-black tracking-tighter uppercase italic text-white">Payments</h1>
           <p className="text-slate-500 font-bold uppercase text-[10px] tracking-[0.4em] mt-2 flex items-center gap-2">
-            <Zap size={12} className="text-blue-500 fill-blue-500" />
+            <Zap size={12} className="text-blue-500" />
             Accounting Terminal
           </p>
         </div>
@@ -276,7 +264,7 @@ const PaymentDesk: React.FC = () => {
         <div className="relative group flex-1 w-full max-w-xl">
           <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-500" size={24} />
           <input 
-            placeholder="Manual student search..."
+            placeholder="Search by ID or Name..."
             className="w-full bg-slate-900 border border-slate-800 rounded-2xl pl-16 pr-8 py-5 text-xl font-black focus:outline-none focus:border-blue-600 transition-all text-white shadow-2xl"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -324,7 +312,7 @@ const PaymentDesk: React.FC = () => {
 
               <div className="p-8 bg-slate-950 rounded-3xl border border-slate-800 shadow-inner">
                 <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.5em] mb-8">Financial Requirements</p>
-                {getUnpaidMonths(selectedStudent.lastPaymentMonth).map(month => (
+                {[`${new Date().getFullYear()}-${(new Date().getMonth() + 1).toString().padStart(2, '0')}`].map(month => (
                   <button key={month} disabled={isProcessing} onClick={() => handleProcessPayment(selectedStudent, month)} className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white p-6 rounded-2xl flex items-center justify-between font-black tracking-tighter transition-all shadow-xl border-b-4 border-blue-800">
                     <div className="flex flex-col items-start">
                       <span className="text-xl md:text-2xl uppercase leading-none">{month} Settlement</span>
@@ -362,7 +350,7 @@ const PaymentDesk: React.FC = () => {
             ) : (
               <div className="h-full bg-slate-900/10 border-4 border-dashed border-slate-800/50 rounded-[4rem] flex flex-col items-center justify-center text-slate-800 p-16 text-center">
                 <Printer size={48} className="opacity-10 mb-10" />
-                <h4 className="text-2xl font-black uppercase tracking-tighter italic opacity-40 leading-tight">Session Ready <br /> for Settlement</h4>
+                <h4 className="text-2xl font-black uppercase tracking-tighter italic opacity-40 leading-tight">Ready for <br /> Settlement</h4>
               </div>
             )}
           </div>
@@ -372,51 +360,40 @@ const PaymentDesk: React.FC = () => {
       {isScannerModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-xl flex items-center justify-center p-6">
           <div className="bg-slate-900 border border-slate-800 rounded-[3rem] p-8 w-full max-w-xl relative shadow-3xl animate-in zoom-in duration-300">
-            <button onClick={closeScanner} className="absolute top-8 right-8 text-slate-500 hover:text-white transition-all"><X size={32}/></button>
+            <button onClick={closeScanner} className="absolute top-8 right-8 text-slate-500 hover:text-white"><X size={32}/></button>
             <h3 className="text-2xl font-black uppercase italic mb-8 text-white">Identity Capture</h3>
             
-            <div className="relative rounded-[2.5rem] overflow-hidden bg-black aspect-video border-4 border-slate-800 min-h-[300px] flex items-center justify-center shadow-inner">
+            <div className="relative rounded-[2rem] overflow-hidden bg-black aspect-square border-4 border-slate-800 min-h-[300px] flex items-center justify-center shadow-inner">
               {!isScannerActive ? (
                 <div className="text-center p-8 space-y-6">
                    <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex items-center gap-3 text-left">
                       <Info size={24} className="text-blue-500" />
-                      <p className="text-[9px] font-black uppercase text-slate-500 tracking-widest leading-relaxed">Secure context check: {isSecure ? 'VERIFIED' : 'RESTRICTED'}.</p>
+                      <p className="text-[9px] font-black uppercase text-slate-500 tracking-widest leading-relaxed">Secure Scan Port Active.</p>
                    </div>
                    
                    <div className="flex flex-col gap-4 w-full max-w-xs mx-auto">
                      {isSecure && (
                        <button 
                         onClick={startScanner}
-                        className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all shadow-xl flex items-center justify-center gap-3 border-b-4 border-blue-800"
+                        className="bg-blue-600 text-white px-8 py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl flex items-center justify-center gap-3 border-b-4 border-blue-800"
                        >
                         <ScanQrCode size={18} />
-                        Open Stream
+                        Start Scan
                        </button>
                      )}
                      
                      <div className="relative">
-                        <input 
-                          type="file" 
-                          accept="image/*" 
-                          capture="environment" 
-                          ref={fileInputRef}
-                          onChange={handleFileScan}
-                          className="hidden" 
-                        />
+                        <input type="file" accept="image/*" capture="environment" ref={fileInputRef} onChange={handleFileScan} className="hidden" />
                         <button 
                           onClick={() => fileInputRef.current?.click()}
                           disabled={isDecodingFile}
-                          className={`w-full ${!isSecure ? 'bg-blue-600 border-blue-800 text-white' : 'bg-slate-800 border-slate-700 text-slate-300'} px-8 py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all flex items-center justify-center gap-3 border-b-4 shadow-xl`}
+                          className="w-full bg-slate-800 text-slate-300 px-8 py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-3 border-b-4 border-slate-700"
                         >
                           {isDecodingFile ? <Loader2 className="animate-spin" size={18} /> : <Camera size={18} />}
-                          {isDecodingFile ? 'Analyzing...' : (!isSecure ? 'Capture Photo' : 'Use Fallback')}
+                          Capture Photo
                         </button>
                       </div>
                    </div>
-
-                   {scannerError && (
-                      <p className="text-rose-500 font-black uppercase text-[8px] tracking-[0.2em]">{scannerError}</p>
-                   )}
                 </div>
               ) : (
                 <div id="qr-reader-payment" className="w-full h-full"></div>
@@ -431,11 +408,11 @@ const PaymentDesk: React.FC = () => {
       {previewImage && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-xl animate-in fade-in duration-300">
           <div className="bg-slate-900 border border-slate-800 rounded-[3rem] p-12 max-w-lg w-full shadow-3xl relative overflow-hidden animate-in zoom-in-95 duration-500">
-            <button onClick={() => setPreviewImage(null)} className="absolute top-10 right-10 text-slate-500 hover:text-white transition-all z-20"><X size={32} /></button>
+            <button onClick={() => setPreviewImage(null)} className="absolute top-10 right-10 text-slate-500 hover:text-white z-20"><X size={32} /></button>
             <div className="flex justify-center mb-10 bg-white p-6 rounded-[2rem] overflow-hidden shadow-2xl border-2 border-slate-200"><img src={previewImage} className="w-full max-w-[280px]" alt="Official Receipt" /></div>
             <div className="grid grid-cols-2 gap-4">
               <button onClick={() => window.print()} className="bg-blue-600 text-white font-black py-5 rounded-2xl flex items-center justify-center gap-3 shadow-xl uppercase text-xs border-b-4 border-blue-800">Print</button>
-              <a href={previewImage} download="Excellence_Receipt.png" className="bg-slate-800 text-white font-black py-5 rounded-2xl flex items-center justify-center gap-3 uppercase text-xs text-center border border-slate-700 shadow-xl">Export PNG</a>
+              <a href={previewImage} download="Receipt.png" className="bg-slate-800 text-white font-black py-5 rounded-2xl flex items-center justify-center gap-3 uppercase text-xs text-center border border-slate-700">Download</a>
             </div>
           </div>
         </div>

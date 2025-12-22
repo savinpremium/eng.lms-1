@@ -5,7 +5,7 @@ import { audioService } from '../services/audioService';
 import { generateWhatsAppDraft } from '../services/geminiService';
 import { Student, PaymentRecord } from '../types';
 import { toPng } from 'html-to-image';
-import { Search, Printer, CreditCard, ChevronRight, User, Hash, X, CheckCircle, Loader2, Sparkles, Zap, ScanQrCode } from 'lucide-react';
+import { Search, Printer, CreditCard, ChevronRight, User, Hash, X, CheckCircle, Loader2, Sparkles, Zap, ScanQrCode, Camera } from 'lucide-react';
 
 const PaymentDesk: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -16,7 +16,8 @@ const PaymentDesk: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSendingUpdate, setIsSendingUpdate] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
-  const [isScanning, setIsScanning] = useState(false);
+  const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
+  const [isScannerActive, setIsScannerActive] = useState(false);
 
   const scannerRef = useRef<any>(null);
 
@@ -32,59 +33,54 @@ const PaymentDesk: React.FC = () => {
     );
   }, [searchTerm, students]);
 
-  const startScanner = async () => {
-    setIsScanning(true);
-    // Give DOM time to mount #qr-reader-payment
-    setTimeout(async () => {
-      try {
-        const Html5Qrcode = (window as any).Html5Qrcode;
-        if (!Html5Qrcode) return;
-
-        if (scannerRef.current) {
-          try {
-            if (scannerRef.current.isScanning) await scannerRef.current.stop();
-            scannerRef.current.clear();
-          } catch (e) {}
-        }
-
-        scannerRef.current = new Html5Qrcode("qr-reader-payment");
-        await scannerRef.current.start(
-          { facingMode: "environment" },
-          { fps: 15, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
-          (decodedText: string) => {
-            const student = students.find(s => s.id.toUpperCase() === decodedText.trim().toUpperCase());
-            if (student) {
-              setSelectedStudent(student);
-              audioService.playSuccess();
-              stopScanner();
-            }
-          },
-          () => {} // silent search errors
-        );
-      } catch (e: any) {
-        console.error("Scanner Error:", e);
-        if (e.name === 'NotAllowedError') {
-          alert("Camera Permission Denied. Please enable camera access in your browser settings.");
-        } else {
-          alert("Scanner Error: Camera access required for optical scanning.");
-        }
-        setIsScanning(false);
-      }
-    }, 200);
+  const openScanner = () => {
+    setIsScannerModalOpen(true);
+    setIsScannerActive(false);
   };
 
-  const stopScanner = async () => {
+  const startScanner = async () => {
+    try {
+      const Html5Qrcode = (window as any).Html5Qrcode;
+      if (!Html5Qrcode) return;
+
+      if (scannerRef.current) {
+        try {
+          if (scannerRef.current.isScanning) await scannerRef.current.stop();
+          scannerRef.current.clear();
+        } catch (e) {}
+      }
+
+      scannerRef.current = new Html5Qrcode("qr-reader-payment");
+      await scannerRef.current.start(
+        { facingMode: "environment" },
+        { fps: 20, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
+        (decodedText: string) => {
+          const student = students.find(s => s.id.toUpperCase() === decodedText.trim().toUpperCase());
+          if (student) {
+            setSelectedStudent(student);
+            audioService.playSuccess();
+            closeScanner();
+          }
+        }
+      );
+      setIsScannerActive(true);
+    } catch (e: any) {
+      console.error("Scanner Error:", e);
+      alert("Scanner Failure: " + (e.name === 'NotAllowedError' ? "Permission Denied" : "Check if your site is using HTTPS."));
+    }
+  };
+
+  const closeScanner = async () => {
     if (scannerRef.current) {
       try {
         if (scannerRef.current.isScanning) {
           await scannerRef.current.stop();
         }
         scannerRef.current.clear();
-      } catch (e) {
-        console.error("Stop scanner error", e);
-      }
+      } catch (e) {}
     }
-    setIsScanning(false);
+    setIsScannerActive(false);
+    setIsScannerModalOpen(false);
   };
 
   const handleProcessPayment = async (student: Student, month: string) => {
@@ -202,7 +198,7 @@ const PaymentDesk: React.FC = () => {
             Fee Collection Station
           </p>
         </div>
-        <button onClick={startScanner} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-4 rounded-2xl flex items-center gap-3 font-black shadow-xl transition-all uppercase text-xs tracking-widest">
+        <button onClick={openScanner} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-4 rounded-2xl flex items-center gap-3 font-black shadow-xl transition-all uppercase text-xs tracking-widest">
           <ScanQrCode size={18} />
           Scan Pass
         </button>
@@ -305,15 +301,30 @@ const PaymentDesk: React.FC = () => {
         </div>
       )}
 
-      {isScanning && (
+      {isScannerModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xl flex items-center justify-center p-6">
           <div className="bg-slate-900 border border-slate-800 rounded-[3rem] p-8 w-full max-w-xl relative">
-            <button onClick={stopScanner} className="absolute top-6 right-6 text-slate-500 hover:text-white transition-all"><X size={32}/></button>
+            <button onClick={closeScanner} className="absolute top-6 right-6 text-slate-500 hover:text-white transition-all"><X size={32}/></button>
             <h3 className="text-2xl font-black uppercase italic mb-8">Pass Key Scanner</h3>
-            <div className="relative rounded-3xl overflow-hidden bg-black aspect-video border-4 border-slate-800 min-h-[300px]">
-              <div id="qr-reader-payment" className="w-full h-full overflow-hidden"></div>
+            
+            <div className="relative rounded-3xl overflow-hidden bg-black aspect-video border-4 border-slate-800 min-h-[300px] flex items-center justify-center">
+              {!isScannerActive ? (
+                <div className="text-center p-8">
+                   <Camera size={48} className="text-blue-500 mx-auto mb-4 opacity-50" />
+                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-6">Permission Check Required</p>
+                   <button 
+                    onClick={startScanner}
+                    className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all shadow-xl"
+                   >
+                    Enable Lens
+                   </button>
+                </div>
+              ) : (
+                <div id="qr-reader-payment" className="w-full h-full overflow-hidden"></div>
+              )}
             </div>
-            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500 mt-6 text-center">Align Student QR with frame</p>
+            
+            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500 mt-6 text-center">Center Student ID in viewport</p>
           </div>
         </div>
       )}

@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { storageService } from '../services/storageService';
 import { audioService } from '../services/audioService';
-import { UserCheck, History, RotateCcw, Loader2, ScanQrCode, AlertTriangle, Check, X, Zap, Camera } from 'lucide-react';
+import { UserCheck, History, RotateCcw, Loader2, ScanQrCode, AlertTriangle, Check, X, Zap, Camera, ShieldAlert } from 'lucide-react';
 import { Student } from '../types';
 
 const AttendanceGate: React.FC = () => {
@@ -14,7 +14,7 @@ const AttendanceGate: React.FC = () => {
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isScannerActive, setIsScannerActive] = useState(false);
-  const [needsManualStart, setNeedsManualStart] = useState(false);
+  const [isSecure, setIsSecure] = useState(true);
 
   const scannerRef = useRef<any>(null);
   const statusRef = useRef(status);
@@ -24,6 +24,12 @@ const AttendanceGate: React.FC = () => {
   }, [status]);
 
   useEffect(() => {
+    // Check for Secure Context (Chrome requires HTTPS for Camera)
+    if (!window.isSecureContext && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      setIsSecure(false);
+      setCameraError("Security Block: Camera access requires HTTPS/Secure connection.");
+    }
+
     const unsub = storageService.listenStudents((data) => {
       setStudents(data);
       setIsDataLoaded(true);
@@ -34,7 +40,6 @@ const AttendanceGate: React.FC = () => {
   const startScanner = async () => {
     if (!isDataLoaded) return;
     setCameraError(null);
-    setNeedsManualStart(false);
 
     try {
       const Html5Qrcode = (window as any).Html5Qrcode;
@@ -43,7 +48,6 @@ const AttendanceGate: React.FC = () => {
         return;
       }
 
-      // Ensure any previous scanner is stopped and cleared
       if (scannerRef.current) {
         try {
           if (scannerRef.current.isScanning) {
@@ -58,12 +62,13 @@ const AttendanceGate: React.FC = () => {
       scannerRef.current = new Html5Qrcode("qr-reader-attendance");
       
       const config = { 
-        fps: 15, 
-        qrbox: { width: 280, height: 280 },
+        fps: 20, 
+        qrbox: { width: 250, height: 250 },
         aspectRatio: 1.0,
         disableFlip: false
       };
 
+      // We use a manual start to satisfy "User Gesture" requirements in Chrome/Mobile
       await scannerRef.current.start(
         { facingMode: "environment" },
         config,
@@ -71,22 +76,16 @@ const AttendanceGate: React.FC = () => {
           if (statusRef.current === 'IDLE') {
             handleScan(decodedText);
           }
-        },
-        (errorMessage: string) => {
-          // Normal feedback loop during scan
         }
       );
       
       setIsScannerActive(true);
     } catch (err: any) {
       console.error("Scanner Error:", err);
-      // Mobile browsers often block camera auto-start. 
-      // We show a manual button to trigger the permission prompt via user gesture.
-      setNeedsManualStart(true);
       if (err.name === 'NotAllowedError' || err.toString().includes('Permission denied')) {
-        setCameraError("Permission Denied. Please allow camera access in browser settings.");
+        setCameraError("Permission Denied. Please enable camera in your browser settings.");
       } else {
-        setCameraError("Camera unavailable or busy. Please retry.");
+        setCameraError("Camera unavailable. This site might need HTTPS to use the camera.");
       }
     }
   };
@@ -104,16 +103,6 @@ const AttendanceGate: React.FC = () => {
       setIsScannerActive(false);
     }
   };
-
-  useEffect(() => {
-    if (isDataLoaded) {
-      // Small delay to ensure the DOM element is fully painted before starting
-      const timer = setTimeout(() => {
-        startScanner();
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [isDataLoaded]);
 
   useEffect(() => {
     return () => {
@@ -199,6 +188,16 @@ const AttendanceGate: React.FC = () => {
         </p>
       </header>
 
+      {!isSecure && (
+        <div className="bg-rose-500/10 border-2 border-rose-500 p-8 rounded-[3rem] text-center animate-in zoom-in duration-500">
+          <ShieldAlert size={48} className="text-rose-500 mx-auto mb-4" />
+          <h3 className="text-xl font-black uppercase text-white mb-2 italic">Connection Insecure</h3>
+          <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest max-w-md mx-auto">
+            Chrome restricts camera access to HTTPS connections. Please ensure you are accessing the site via a secure URL.
+          </p>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
         <div className={`relative rounded-[5rem] overflow-hidden border-8 transition-all duration-300 shadow-3xl bg-slate-900 min-h-[550px] flex flex-col items-center justify-center p-0 text-center ${
           status === 'SUCCESS' ? 'border-emerald-500 shadow-emerald-500/20' : 
@@ -206,19 +205,20 @@ const AttendanceGate: React.FC = () => {
           status === 'ERROR' ? 'border-rose-500 shadow-rose-500/20' : 
           'border-slate-800'
         }`}>
-          {needsManualStart ? (
+          {!isScannerActive ? (
             <div className="p-12 animate-in zoom-in duration-500">
               <Camera size={64} className="text-blue-500 mx-auto mb-8 opacity-50" />
-              <h3 className="text-white font-black uppercase text-xl tracking-tight mb-2 italic">Camera Gesture Required</h3>
+              <h3 className="text-white font-black uppercase text-xl tracking-tight mb-2 italic">Sensor Activation</h3>
               <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest mb-10 max-w-xs mx-auto leading-relaxed">
-                Mobile browsers require a manual click to activate optical sensors.
+                Click below to initialize optical sensors. This manual step is required for browser security.
               </p>
               <button 
                 onClick={startScanner}
-                className="bg-blue-600 hover:bg-blue-500 text-white px-10 py-5 rounded-[2rem] font-black uppercase text-xs tracking-[0.2em] transition-all shadow-2xl shadow-blue-600/20 flex items-center gap-4 mx-auto"
+                disabled={!isSecure}
+                className="bg-blue-600 hover:bg-blue-500 disabled:opacity-30 disabled:grayscale text-white px-10 py-5 rounded-[2rem] font-black uppercase text-xs tracking-[0.2em] transition-all shadow-2xl shadow-blue-600/20 flex items-center gap-4 mx-auto"
               >
                 <ScanQrCode size={20} />
-                Activate Lens
+                Activate Gate
               </button>
               {cameraError && (
                 <p className="mt-8 text-rose-500 font-black uppercase text-[9px] tracking-[0.3em]">{cameraError}</p>
@@ -228,13 +228,6 @@ const AttendanceGate: React.FC = () => {
             <div className="relative w-full h-[550px] bg-black">
               {/* HTML5 QR Code Mount point */}
               <div id="qr-reader-attendance" className="w-full h-full overflow-hidden"></div>
-
-              {!isScannerActive && !needsManualStart && (
-                <div className="absolute inset-0 bg-slate-900 flex flex-col items-center justify-center gap-4 z-10">
-                  <Loader2 className="animate-spin text-blue-500" size={48} />
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Initializing Optical Input...</p>
-                </div>
-              )}
 
               {/* Status Overlays */}
               {status !== 'IDLE' && (

@@ -4,7 +4,7 @@ import { Page, Grade, Student } from '../types';
 import { storageService } from '../services/storageService';
 import { audioService } from '../services/audioService';
 import { toPng } from 'html-to-image';
-import { CheckCircle, ArrowRight, ShieldCheck, QrCode, Lock, Printer, UserCheck, Loader2, X, Download } from 'lucide-react';
+import { CheckCircle, ArrowRight, ShieldCheck, QrCode, Lock, Printer, UserCheck, Loader2, X, Download, MessageSquare } from 'lucide-react';
 
 interface LandingPageProps {
   onNavigate: (page: Page) => void;
@@ -14,7 +14,7 @@ interface LandingPageProps {
 const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, onLoginSuccess }) => {
   const [formData, setFormData] = useState({
     name: '',
-    grade: 'Grade 6' as Grade,
+    grade: 'Grade 1' as Grade,
     parentName: '',
     contact: ''
   });
@@ -28,13 +28,18 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, onLoginSuccess })
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const year = new Date().getFullYear();
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const prevDate = new Date(year, month - 1);
+    const lastPaid = `${prevDate.getFullYear()}-${(prevDate.getMonth() + 1).toString().padStart(2, '0')}`;
+    
     const id = `STU-${year}-${Math.floor(1000 + Math.random() * 9000)}`;
     const newStudent: Student = {
       ...formData,
       id,
-      lastPaymentMonth: `${year}-01`,
-      registrationDate: new Date().toISOString().split('T')[0]
+      lastPaymentMonth: lastPaid,
+      registrationDate: now.toISOString().split('T')[0]
     };
     await storageService.saveStudent(newStudent);
     setRegisteredStudent(newStudent);
@@ -61,7 +66,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, onLoginSuccess })
         <div style="flex: 1; padding: 6mm 8mm; display: flex; flex-direction: column; justify-content: space-between; z-index: 10;">
           <div>
             <h1 style="font-size: 11pt; font-weight: 900; color: #3b82f6; margin: 0; text-transform: uppercase;">Excellence English</h1>
-            <p style="font-size: 5pt; letter-spacing: 1px; font-weight: 800; color: #64748b; margin: 0; text-transform: uppercase;">Institutional Network</p>
+            <p style="font-size: 5pt; letter-spacing: 1px; font-weight: 800; color: #64748b; margin: 0; text-transform: uppercase;">Student Network</p>
           </div>
           <div>
             <h2 style="font-size: 13pt; font-weight: 900; margin: 0; color: #f8fafc; text-transform: uppercase; line-height: 1.1;">${registeredStudent.name}</h2>
@@ -106,6 +111,14 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, onLoginSuccess })
     printSection.innerHTML = '';
   };
 
+  const handleShareWhatsApp = () => {
+    if (!registeredStudent) return;
+    const phone = registeredStudent.contact.replace(/\D/g, '');
+    const waPhone = phone.startsWith('0') ? '94' + phone.substring(1) : phone;
+    const text = encodeURIComponent(`Hello ${registeredStudent.parentName}, your child ${registeredStudent.name}'s Student ID card (${registeredStudent.id}) has been generated at Excellence English. Please download it from the portal or collect the physical card.`);
+    window.open(`https://wa.me/${waPhone}?text=${text}`, '_blank');
+  };
+
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (loginForm.username === 'Iresha1978' && loginForm.password === 'Iresha1978') {
@@ -114,6 +127,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, onLoginSuccess })
       audioService.playError();
     }
   };
+
+  const grades: Grade[] = ['Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11'];
 
   return (
     <div className="relative">
@@ -155,12 +170,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, onLoginSuccess })
                 <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest">Start your academic journey today</p>
               </div>
               <div className="space-y-3">
-                <input required placeholder="Full Name" className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 focus:outline-none focus:border-blue-600 transition-all font-bold text-sm" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
+                <input required placeholder="Student Full Name" className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 focus:outline-none focus:border-blue-600 transition-all font-bold text-sm" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
                 <div className="grid grid-cols-2 gap-4">
                   <select className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 focus:outline-none focus:border-blue-600 transition-all appearance-none font-bold text-sm" value={formData.grade} onChange={(e) => setFormData({...formData, grade: e.target.value as Grade})}>
-                    <option>Grade 6</option><option>Grade 7</option><option>Grade 8</option><option>Grade 9</option><option>O/L</option><option>A/L</option>
+                    {grades.map(g => <option key={g} value={g}>{g}</option>)}
                   </select>
-                  <input required placeholder="WhatsApp" className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 focus:outline-none focus:border-blue-600 transition-all font-bold text-sm" value={formData.contact} onChange={(e) => setFormData({...formData, contact: e.target.value})} />
+                  <input required placeholder="WhatsApp Contact" className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 focus:outline-none focus:border-blue-600 transition-all font-bold text-sm" value={formData.contact} onChange={(e) => setFormData({...formData, contact: e.target.value})} />
                 </div>
                 <input required placeholder="Guardian Name" className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 focus:outline-none focus:border-blue-600 transition-all font-bold text-sm" value={formData.parentName} onChange={(e) => setFormData({...formData, parentName: e.target.value})} />
               </div>
@@ -178,7 +193,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, onLoginSuccess })
               <p className="text-slate-500 font-bold uppercase text-[9px] tracking-[0.4em] mb-10">Credentials Generated Successfully</p>
               
               <div className="bg-slate-950 p-6 md:p-8 rounded-[2rem] border border-blue-900/30 mb-10 relative overflow-hidden group shadow-2xl">
-                <p className="text-[9px] tracking-[0.5em] font-black text-slate-600 mb-2 uppercase">Personnel ID</p>
+                <p className="text-[9px] tracking-[0.5em] font-black text-slate-600 mb-2 uppercase">Student ID</p>
                 <p className="text-4xl font-black text-blue-500 tracking-tighter mb-8">{registeredStudent.id}</p>
                 
                 <div className="bg-white p-4 rounded-2xl inline-block shadow-2xl">
@@ -206,7 +221,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, onLoginSuccess })
                   Student Portal
                 </button>
               </div>
-              <button onClick={() => setRegisteredStudent(null)} className="mt-8 text-slate-600 font-bold text-[9px] uppercase tracking-[0.4em] hover:text-white transition-all">Submit Next Student</button>
+              <button onClick={() => setRegisteredStudent(null)} className="mt-8 text-slate-600 font-bold text-[9px] uppercase tracking-[0.4em] hover:text-white transition-all">Register Next Student</button>
             </div>
           )}
         </div>
@@ -240,7 +255,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, onLoginSuccess })
             </button>
             
             <div className="text-center mb-10">
-              <h2 className="text-3xl font-black uppercase italic tracking-tighter mb-2">Institutional Pass</h2>
+              <h2 className="text-3xl font-black uppercase italic tracking-tighter mb-2">Student Pass</h2>
               <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest">Verification ID Card 2025</p>
             </div>
 
@@ -250,18 +265,25 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, onLoginSuccess })
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <button 
                 onClick={handlePrint}
-                className="flex-1 bg-blue-600 text-white font-black py-5 rounded-2xl flex items-center justify-center gap-3 shadow-xl shadow-blue-600/20 hover:bg-blue-500 transition-all uppercase tracking-widest text-xs"
+                className="bg-blue-600 text-white font-black py-5 rounded-2xl flex items-center justify-center gap-3 shadow-xl shadow-blue-600/20 hover:bg-blue-500 transition-all uppercase tracking-widest text-xs"
               >
                 <Printer size={20} />
-                Print Image
+                Print Card
+              </button>
+              <button 
+                onClick={handleShareWhatsApp}
+                className="bg-emerald-600 text-white font-black py-5 rounded-2xl flex items-center justify-center gap-3 shadow-xl shadow-emerald-600/20 hover:bg-emerald-500 transition-all uppercase tracking-widest text-xs"
+              >
+                <MessageSquare size={20} />
+                Send via WhatsApp
               </button>
               <a 
                 href={previewImage} 
                 download={`${registeredStudent?.id}_card.png`}
-                className="flex-1 bg-slate-800 text-white font-black py-5 rounded-2xl flex items-center justify-center gap-3 hover:bg-slate-700 transition-all uppercase tracking-widest text-xs"
+                className="bg-slate-800 text-white font-black py-5 rounded-2xl flex items-center justify-center gap-3 hover:bg-slate-700 transition-all uppercase tracking-widest text-xs"
               >
                 <Download size={20} />
                 Download

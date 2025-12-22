@@ -4,12 +4,12 @@ import { Grade, Student } from '../types';
 import { storageService } from '../services/storageService';
 import { audioService } from '../services/audioService';
 import { toPng } from 'html-to-image';
-import { UserPlus, ArrowRight, ShieldCheck, Info, Printer, CheckCircle, Loader2, X, Printer as PrinterIcon, Download } from 'lucide-react';
+import { UserPlus, ArrowRight, ShieldCheck, Info, Printer, CheckCircle, Loader2, X, Printer as PrinterIcon, Download, MessageSquare } from 'lucide-react';
 
 const Enrollment: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
   const [formData, setFormData] = useState({
     name: '',
-    grade: 'Grade 6' as Grade,
+    grade: 'Grade 1' as Grade,
     parentName: '',
     contact: ''
   });
@@ -24,8 +24,7 @@ const Enrollment: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
     
     const now = new Date();
     const year = now.getFullYear();
-    const month = now.getMonth(); // 0-indexed
-    // Set to previous month so current month is "not paid"
+    const month = now.getMonth();
     const prevDate = new Date(year, month - 1);
     const lastPaid = `${prevDate.getFullYear()}-${(prevDate.getMonth() + 1).toString().padStart(2, '0')}`;
     
@@ -108,6 +107,16 @@ const Enrollment: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
     printSection.innerHTML = '';
   };
 
+  const handleShareWhatsApp = () => {
+    if (!successStudent) return;
+    const phone = successStudent.contact.replace(/\D/g, '');
+    const waPhone = phone.startsWith('0') ? '94' + phone.substring(1) : phone;
+    const text = encodeURIComponent(`Hello ${successStudent.parentName}, your child ${successStudent.name}'s Student ID card (${successStudent.id}) has been generated at Excellence English.`);
+    window.open(`https://wa.me/${waPhone}?text=${text}`, '_blank');
+  };
+
+  const grades: Grade[] = ['Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11'];
+
   if (successStudent) {
     return (
       <div className="max-w-3xl mx-auto space-y-12 animate-in zoom-in-95 duration-700 pb-20">
@@ -117,7 +126,7 @@ const Enrollment: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
           </div>
           <div>
             <h2 className="text-3xl md:text-5xl font-black tracking-tighter uppercase italic mb-4 leading-none">Enrollment Verified</h2>
-            <p className="text-slate-400 font-bold max-w-md mx-auto text-base md:text-lg leading-relaxed">Personnel <b>{successStudent.name}</b> has been successfully provisioned with ID <b>{successStudent.id}</b>.</p>
+            <p className="text-slate-400 font-bold max-w-md mx-auto text-base md:text-lg leading-relaxed">Student <b>{successStudent.name}</b> has been successfully provisioned with ID <b>{successStudent.id}</b>.</p>
           </div>
 
           <div className="flex flex-col md:flex-row gap-4 justify-center">
@@ -137,7 +146,7 @@ const Enrollment: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
             </button>
           </div>
           
-          <button onClick={() => setSuccessStudent(null)} className="text-slate-600 font-bold uppercase text-[9px] tracking-[0.5em] hover:text-white transition-all">Enroll Subsequent Personnel</button>
+          <button onClick={() => setSuccessStudent(null)} className="text-slate-600 font-bold uppercase text-[9px] tracking-[0.5em] hover:text-white transition-all">Enroll Subsequent Student</button>
         </div>
 
         {/* ID Card Pop-up Preview */}
@@ -159,18 +168,25 @@ const Enrollment: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <button 
                   onClick={handlePrintActual}
-                  className="flex-1 bg-blue-600 text-white font-black py-5 rounded-2xl flex items-center justify-center gap-3 shadow-xl shadow-blue-600/20 hover:bg-blue-500 transition-all uppercase tracking-widest text-xs"
+                  className="bg-blue-600 text-white font-black py-5 rounded-2xl flex items-center justify-center gap-3 shadow-xl shadow-blue-600/20 hover:bg-blue-500 transition-all uppercase tracking-widest text-xs"
                 >
                   <PrinterIcon size={20} />
                   Print Card
                 </button>
+                <button 
+                  onClick={handleShareWhatsApp}
+                  className="bg-emerald-600 text-white font-black py-5 rounded-2xl flex items-center justify-center gap-3 shadow-xl shadow-emerald-600/20 hover:bg-emerald-500 transition-all uppercase tracking-widest text-xs"
+                >
+                  <MessageSquare size={20} />
+                  WhatsApp
+                </button>
                 <a 
                   href={previewImage} 
                   download={`${successStudent?.id}_card.png`}
-                  className="flex-1 bg-slate-800 text-white font-black py-5 rounded-2xl flex items-center justify-center gap-3 hover:bg-slate-700 transition-all uppercase tracking-widest text-xs"
+                  className="bg-slate-800 text-white font-black py-5 rounded-2xl flex items-center justify-center gap-3 hover:bg-slate-700 transition-all uppercase tracking-widest text-xs"
                 >
                   <Download size={20} />
                   Download
@@ -188,7 +204,7 @@ const Enrollment: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
       <header className="flex justify-between items-end animate-in fade-in slide-in-from-top-4 duration-500">
         <div>
           <h1 className="text-4xl md:text-6xl font-black tracking-tighter uppercase italic leading-none">Register Now</h1>
-          <p className="text-slate-500 font-bold uppercase tracking-[0.6em] text-[10px] mt-3">Personnel Provisioning Station</p>
+          <p className="text-slate-500 font-bold uppercase tracking-[0.6em] text-[10px] mt-3">Student Provisioning Station</p>
         </div>
         <div className="hidden lg:flex items-center gap-6 text-slate-800 opacity-20">
            <ShieldCheck size={56} />
@@ -201,7 +217,7 @@ const Enrollment: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
           <form onSubmit={handleSubmit} className="space-y-8 md:space-y-10">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10">
               <div className="space-y-3">
-                <label className="block text-xs font-black tracking-[0.5em] uppercase text-slate-600">Personnel Full Name</label>
+                <label className="block text-xs font-black tracking-[0.5em] uppercase text-slate-600">Student Full Name</label>
                 <input 
                   required
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl md:rounded-2xl px-6 py-4 md:py-6 focus:border-blue-600 focus:outline-none font-bold text-lg md:text-xl shadow-inner transition-all"
@@ -216,12 +232,7 @@ const Enrollment: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
                   value={formData.grade}
                   onChange={e => setFormData({...formData, grade: e.target.value as Grade})}
                 >
-                  <option>Grade 6</option>
-                  <option>Grade 7</option>
-                  <option>Grade 8</option>
-                  <option>Grade 9</option>
-                  <option>O/L</option>
-                  <option>A/L</option>
+                  {grades.map(g => <option key={g} value={g}>{g}</option>)}
                 </select>
               </div>
             </div>

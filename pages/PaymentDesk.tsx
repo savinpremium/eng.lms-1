@@ -4,7 +4,7 @@ import { storageService } from '../services/storageService';
 import { audioService } from '../services/audioService';
 import { Student, PaymentRecord } from '../types';
 import { toPng } from 'html-to-image';
-import { Search, Printer, CreditCard, ChevronRight, User, Hash, ScanQrCode, X, CheckCircle, Loader2, RotateCcw, Download } from 'lucide-react';
+import { Search, Printer, CreditCard, ChevronRight, User, Hash, ScanQrCode, X, CheckCircle, Loader2, RotateCcw, Download, MessageSquare } from 'lucide-react';
 
 const PaymentDesk: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -18,6 +18,7 @@ const PaymentDesk: React.FC = () => {
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const scannerLoopRef = useRef<number | null>(null);
 
   useEffect(() => {
     return storageService.listenStudents(setStudents);
@@ -31,69 +32,75 @@ const PaymentDesk: React.FC = () => {
     );
   }, [searchTerm, students]);
 
-  useEffect(() => {
-    let animationFrameId: number;
-    if (!isScanning) return;
+  const tick = () => {
+    if (videoRef.current && canvasRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      if (ctx) {
+        canvas.height = videoRef.current.videoHeight;
+        canvas.width = videoRef.current.videoWidth;
+        ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        
+        // Use jsQR from window
+        const code = (window as any).jsQR?.(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: "dontInvert",
+        });
 
-    const startScanner = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.play();
-          requestAnimationFrame(tick);
-        }
-      } catch (err) {
-        setIsScanning(false);
-      }
-    };
-
-    const tick = () => {
-      if (videoRef.current && canvasRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
-        const canvas = canvasRef.current;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          canvas.height = videoRef.current.videoHeight;
-          canvas.width = videoRef.current.videoWidth;
-          ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const code = (window as any).jsQR(imageData.data, imageData.width, imageData.height, {
-            inversionAttempts: "dontInvert",
-          });
-
-          if (code && code.data && code.data.startsWith('STU-')) {
-            const found = students.find(s => s.id === code.data);
-            if (found) {
-              setSelectedStudent(found);
-              setIsScanning(false);
-              audioService.playSuccess();
-              const stream = videoRef.current.srcObject as MediaStream;
-              stream.getTracks().forEach(track => track.stop());
-            }
+        if (code && code.data && code.data.startsWith('STU-')) {
+          const found = students.find(s => s.id === code.data);
+          if (found) {
+            setSelectedStudent(found);
+            setIsScanning(false);
+            audioService.playSuccess();
+            stopScanner();
+            return; // Stop the loop
           }
         }
       }
-      animationFrameId = requestAnimationFrame(tick);
-    };
+    }
+    scannerLoopRef.current = requestAnimationFrame(tick);
+  };
 
-    startScanner();
-    return () => {
-      cancelAnimationFrame(animationFrameId);
-      if (videoRef.current?.srcObject) {
-        const stream = videoRef.current.srcObject as MediaStream;
-        stream.getTracks().forEach(track => track.stop());
+  const startScanner = async () => {
+    setIsScanning(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+        scannerLoopRef.current = requestAnimationFrame(tick);
       }
-    };
-  }, [isScanning, students]);
+    } catch (err) {
+      console.error('Camera access failed', err);
+      setIsScanning(false);
+    }
+  };
+
+  const stopScanner = () => {
+    if (scannerLoopRef.current) {
+      cancelAnimationFrame(scannerLoopRef.current);
+      scannerLoopRef.current = null;
+    }
+    if (videoRef.current?.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => stopScanner();
+  }, []);
 
   const handleProcessPayment = async (student: Student, month: string) => {
     if (isProcessing) return;
     setIsProcessing(true);
 
     const payment: PaymentRecord = {
-      id: '', // Will be set by service
+      id: '', // Service sets it
       studentId: student.id,
-      amount: 1000, // Monthly charge updated to 1000 LKR
+      amount: 1000, 
       month,
       method: 'Cash',
       timestamp: Date.now()
@@ -214,6 +221,14 @@ const PaymentDesk: React.FC = () => {
     printSection.innerHTML = '';
   };
 
+  const handleShareWhatsApp = () => {
+    if (!selectedStudent || !lastReceipt) return;
+    const phone = selectedStudent.contact.replace(/\D/g, '');
+    const waPhone = phone.startsWith('0') ? '94' + phone.substring(1) : phone;
+    const text = encodeURIComponent(`Hello ${selectedStudent.parentName}, the receipt for ${selectedStudent.name}'s payment for ${lastReceipt.month} (Receipt ID: ${lastReceipt.id}) has been issued by Excellence English. Download it here or collect a printout at the desk.`);
+    window.open(`https://wa.me/${waPhone}?text=${text}`, '_blank');
+  };
+
   const getUnpaidMonths = (lastPaid: string) => {
     const [year, month] = lastPaid.split('-').map(Number);
     const nextMonth = month === 12 ? 1 : month + 1;
@@ -260,7 +275,7 @@ const PaymentDesk: React.FC = () => {
         </div>
 
         <button 
-          onClick={() => setIsScanning(true)}
+          onClick={startScanner}
           className="w-full md:w-auto bg-blue-600 hover:bg-blue-500 text-white px-10 py-4 md:py-5 rounded-2xl flex items-center justify-center gap-4 font-black shadow-lg transition-all transform hover:scale-105 uppercase tracking-tighter text-base md:text-lg"
         >
           <ScanQrCode size={28} />
@@ -274,7 +289,7 @@ const PaymentDesk: React.FC = () => {
             <div className="flex justify-between items-center">
               <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-4 italic">
                 <User className="text-blue-500" size={28}/>
-                Identity Profile
+                Student Profile
               </h3>
               <button onClick={() => { setSelectedStudent(null); setLastReceipt(null); }} className="w-10 h-10 bg-slate-950 rounded-xl flex items-center justify-center text-slate-700 hover:text-white transition-all shadow-inner">
                 <X size={24} />
@@ -348,7 +363,7 @@ const PaymentDesk: React.FC = () => {
                   
                   <div className="space-y-4 font-mono text-xs border-y-2 border-slate-100 py-10">
                     <div className="flex justify-between"><span>REF ID</span> <span className="font-black">${lastReceipt.id}</span></div>
-                    <div className="flex justify-between uppercase"><span>PERSONNEL</span> <span className="font-black">${selectedStudent.name}</span></div>
+                    <div className="flex justify-between uppercase"><span>STUDENT</span> <span className="font-black">${selectedStudent.name}</span></div>
                     <div className="flex justify-between text-xl font-black border-t-2 border-slate-100 pt-8 mt-4"><span>GRAND TOTAL</span> <span>LKR ${lastReceipt.amount.toLocaleString()}.00</span></div>
                   </div>
 
@@ -377,13 +392,90 @@ const PaymentDesk: React.FC = () => {
                   <Printer size={48} className="opacity-20" />
                 </div>
                 <h4 className="text-2xl md:text-3xl font-black uppercase tracking-tighter italic opacity-60">Terminal Standby</h4>
-                <p className="font-bold uppercase text-[10px] tracking-[0.5em] opacity-30 mt-3">Identify personnel to access ledger</p>
+                <p className="font-bold uppercase text-[10px] tracking-[0.5em] opacity-30 mt-3">Identify student to access ledger</p>
               </div>
             )}
           </div>
         </div>
       )}
-      {/* (Scanner Modal and Preview Popup code unchanged for brevity - assuming inclusion in final build) */}
+
+      {/* QR Scanner Modal */}
+      {isScanning && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 backdrop-blur-3xl bg-slate-950/80">
+          <div className="bg-slate-900 w-full max-w-xl p-8 rounded-[4rem] border border-slate-800 shadow-3xl overflow-hidden relative">
+            <button 
+              onClick={() => { setIsScanning(false); stopScanner(); }}
+              className="absolute top-6 right-6 z-10 w-12 h-12 bg-slate-950 rounded-full flex items-center justify-center text-slate-700 hover:text-white transition-all shadow-2xl border border-slate-800"
+            >
+              <X size={28} />
+            </button>
+            <div className="text-center mb-10">
+              <h3 className="text-3xl font-black tracking-tighter uppercase italic leading-none">Optical Gate</h3>
+              <p className="text-slate-500 font-bold uppercase tracking-[0.5em] text-[10px] mt-2">Scan Student Identity Pass</p>
+            </div>
+            
+            <div className="relative rounded-[3rem] overflow-hidden border-4 md:border-8 border-slate-800 shadow-3xl">
+              <video ref={videoRef} className="w-full h-[400px] md:h-[500px] object-cover scale-x-[-1]" />
+              <canvas ref={canvasRef} className="hidden" />
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="w-64 h-64 md:w-80 md:h-80 border-2 md:border-4 border-blue-600/60 rounded-[3rem] animate-pulse shadow-[0_0_150px_rgba(37,99,235,0.3)]"></div>
+              </div>
+            </div>
+            
+            <button 
+              onClick={() => { setIsScanning(false); stopScanner(); }}
+              className="w-full mt-10 bg-slate-800 text-white py-6 rounded-2xl font-black uppercase tracking-[0.3em] text-[10px] hover:bg-slate-700 transition-all border border-slate-700 shadow-xl"
+            >
+              TERMINATE SCANNER
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Receipt Pop-up Preview */}
+      {previewImage && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-xl animate-in fade-in duration-300">
+          <div className="bg-slate-900 border border-slate-800 rounded-[3rem] p-8 md:p-12 max-w-lg w-full shadow-3xl relative overflow-hidden animate-in zoom-in-95 duration-500">
+            <button onClick={() => setPreviewImage(null)} className="absolute top-8 right-8 text-slate-500 hover:text-white transition-all">
+              <X size={32} />
+            </button>
+            
+            <div className="text-center mb-10">
+              <h2 className="text-2xl font-black uppercase italic tracking-tighter mb-2">Billing Receipt</h2>
+              <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest">Digital Settlement Evidence</p>
+            </div>
+
+            <div className="flex justify-center mb-10 bg-white p-4 rounded-3xl">
+              <img src={previewImage} className="w-full max-w-[280px] rounded shadow-lg" alt="Receipt Preview" />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <button 
+                onClick={handlePrint}
+                className="bg-blue-600 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-3 shadow-xl shadow-blue-600/20 hover:bg-blue-500 transition-all uppercase tracking-widest text-[9px]"
+              >
+                <Printer size={16} />
+                Print
+              </button>
+              <button 
+                onClick={handleShareWhatsApp}
+                className="bg-emerald-600 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-3 shadow-xl shadow-emerald-600/20 hover:bg-emerald-500 transition-all uppercase tracking-widest text-[9px]"
+              >
+                <MessageSquare size={16} />
+                WhatsApp
+              </button>
+              <a 
+                href={previewImage} 
+                download={`${lastReceipt?.id}_receipt.png`}
+                className="bg-slate-800 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-3 hover:bg-slate-700 transition-all uppercase tracking-widest text-[9px]"
+              >
+                <Download size={16} />
+                Download
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -6,6 +6,7 @@ import StudentPortal from './pages/StudentPortal';
 import Dashboard from './pages/Dashboard';
 import StudentRegistry from './pages/StudentRegistry';
 import AttendanceGate from './pages/AttendanceGate';
+import ClassAttendance from './pages/ClassAttendance';
 import PaymentDesk from './pages/PaymentDesk';
 import AIMessenger from './pages/AIMessenger';
 import Enrollment from './pages/Enrollment';
@@ -25,6 +26,7 @@ const App: React.FC = () => {
       Page.DASHBOARD, 
       Page.STUDENTS, 
       Page.ATTENDANCE, 
+      Page.CLASS_ATTENDANCE,
       Page.PAYMENTS, 
       Page.MESSENGER,
       Page.ENROLLMENT
@@ -51,6 +53,7 @@ const App: React.FC = () => {
     Page.DASHBOARD, 
     Page.STUDENTS, 
     Page.ATTENDANCE, 
+    Page.CLASS_ATTENDANCE,
     Page.PAYMENTS, 
     Page.MESSENGER,
     Page.ENROLLMENT
@@ -68,6 +71,8 @@ const App: React.FC = () => {
         return <StudentRegistry onNavigate={navigate} />;
       case Page.ATTENDANCE:
         return <AttendanceGate />;
+      case Page.CLASS_ATTENDANCE:
+        return <ClassAttendance />;
       case Page.PAYMENTS:
         return <PaymentDesk />;
       case Page.MESSENGER:

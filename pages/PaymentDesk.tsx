@@ -42,19 +42,21 @@ const PaymentDesk: React.FC = () => {
         ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         
-        // Use jsQR from window
-        const code = (window as any).jsQR?.(imageData.data, imageData.width, imageData.height, {
-          inversionAttempts: "dontInvert",
-        });
+        // Ensure jsQR is available on window
+        if ((window as any).jsQR) {
+          const code = (window as any).jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: "dontInvert",
+          });
 
-        if (code && code.data && code.data.startsWith('STU-')) {
-          const found = students.find(s => s.id === code.data);
-          if (found) {
-            setSelectedStudent(found);
-            setIsScanning(false);
-            audioService.playSuccess();
-            stopScanner();
-            return; // Stop the loop
+          if (code && code.data && code.data.startsWith('STU-')) {
+            const found = students.find(s => s.id === code.data);
+            if (found) {
+              setSelectedStudent(found);
+              setIsScanning(false);
+              audioService.playSuccess();
+              stopScanner();
+              return;
+            }
           }
         }
       }
@@ -68,8 +70,10 @@ const PaymentDesk: React.FC = () => {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.play();
-        scannerLoopRef.current = requestAnimationFrame(tick);
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current?.play().catch(e => console.error(e));
+          scannerLoopRef.current = requestAnimationFrame(tick);
+        };
       }
     } catch (err) {
       console.error('Camera access failed', err);
@@ -106,14 +110,19 @@ const PaymentDesk: React.FC = () => {
       timestamp: Date.now()
     };
 
-    const id = await storageService.addPayment(payment);
-    const updatedStudent = { ...student, lastPaymentMonth: month };
-    await storageService.updateStudent(updatedStudent);
-    
-    setSelectedStudent(updatedStudent);
-    setLastReceipt({ ...payment, id });
-    setIsProcessing(false);
-    audioService.playCash();
+    try {
+      const id = await storageService.addPayment(payment);
+      const updatedStudent = { ...student, lastPaymentMonth: month };
+      await storageService.updateStudent(updatedStudent);
+      
+      setSelectedStudent(updatedStudent);
+      setLastReceipt({ ...payment, id });
+      audioService.playCash();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const undoLastPayment = async () => {
@@ -198,7 +207,7 @@ const PaymentDesk: React.FC = () => {
     `;
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 800));
+      await new Promise(resolve => setTimeout(resolve, 1000));
       const node = document.getElementById('receipt-capture-target');
       if (node) {
         const dataUrl = await toPng(node, { pixelRatio: 2.5, skipFonts: true, fontEmbedCSS: '' });
@@ -225,7 +234,7 @@ const PaymentDesk: React.FC = () => {
     if (!selectedStudent || !lastReceipt) return;
     const phone = selectedStudent.contact.replace(/\D/g, '');
     const waPhone = phone.startsWith('0') ? '94' + phone.substring(1) : phone;
-    const text = encodeURIComponent(`Hello ${selectedStudent.parentName}, the receipt for ${selectedStudent.name}'s payment for ${lastReceipt.month} (Receipt ID: ${lastReceipt.id}) has been issued by Excellence English. Download it here or collect a printout at the desk.`);
+    const text = encodeURIComponent(`Hello ${selectedStudent.parentName}, the receipt for ${selectedStudent.name}'s payment for ${lastReceipt.month} (Receipt ID: ${lastReceipt.id}) has been issued by Excellence English.`);
     window.open(`https://wa.me/${waPhone}?text=${text}`, '_blank');
   };
 
@@ -436,7 +445,7 @@ const PaymentDesk: React.FC = () => {
       {previewImage && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-xl animate-in fade-in duration-300">
           <div className="bg-slate-900 border border-slate-800 rounded-[3rem] p-8 md:p-12 max-w-lg w-full shadow-3xl relative overflow-hidden animate-in zoom-in-95 duration-500">
-            <button onClick={() => setPreviewImage(null)} className="absolute top-8 right-8 text-slate-500 hover:text-white transition-all">
+            <button onClick={() => setPreviewImage(null)} className="absolute top-8 right-8 text-slate-500 hover:text-white transition-all z-10">
               <X size={32} />
             </button>
             
@@ -445,11 +454,11 @@ const PaymentDesk: React.FC = () => {
               <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest">Digital Settlement Evidence</p>
             </div>
 
-            <div className="flex justify-center mb-10 bg-white p-4 rounded-3xl">
+            <div className="flex justify-center mb-10 bg-white p-4 rounded-3xl overflow-hidden">
               <img src={previewImage} className="w-full max-w-[280px] rounded shadow-lg" alt="Receipt Preview" />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <button 
                 onClick={handlePrint}
                 className="bg-blue-600 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-3 shadow-xl shadow-blue-600/20 hover:bg-blue-500 transition-all uppercase tracking-widest text-[9px]"
@@ -466,12 +475,18 @@ const PaymentDesk: React.FC = () => {
               </button>
               <a 
                 href={previewImage} 
-                download={`${lastReceipt?.id}_receipt.png`}
+                download={`${selectedStudent?.name.replace(/\s+/g, '_')}_receipt_${lastReceipt?.month}.png`}
                 className="bg-slate-800 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-3 hover:bg-slate-700 transition-all uppercase tracking-widest text-[9px]"
               >
                 <Download size={16} />
                 Download
               </a>
+              <button 
+                onClick={() => setPreviewImage(null)}
+                className="bg-slate-950 text-slate-500 font-black py-4 rounded-2xl hover:text-white transition-all uppercase tracking-widest text-[9px] border border-slate-800"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>

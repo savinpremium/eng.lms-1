@@ -22,13 +22,19 @@ const Enrollment: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
     e.preventDefault();
     setLoading(true);
     
-    const year = new Date().getFullYear();
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth(); // 0-indexed
+    // Set to previous month so current month is "not paid"
+    const prevDate = new Date(year, month - 1);
+    const lastPaid = `${prevDate.getFullYear()}-${(prevDate.getMonth() + 1).toString().padStart(2, '0')}`;
+    
     const id = `STU-${year}-${Math.floor(1000 + Math.random() * 9000)}`;
     const newStudent: Student = {
       ...formData,
       id,
-      lastPaymentMonth: `${year}-01`,
-      registrationDate: new Date().toISOString().split('T')[0]
+      lastPaymentMonth: lastPaid,
+      registrationDate: now.toISOString().split('T')[0]
     };
     
     await storageService.saveStudent(newStudent);

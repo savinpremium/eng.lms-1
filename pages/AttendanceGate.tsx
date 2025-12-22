@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { storageService } from '../services/storageService';
 import { audioService } from '../services/audioService';
-import { ShieldCheck, AlertCircle, Scan, History, Camera, AlertTriangle, UserCheck, RotateCcw } from 'lucide-react';
+import { ShieldCheck, AlertCircle, Scan, History, Camera, AlertTriangle, UserCheck, RotateCcw, Check, X } from 'lucide-react';
 import { Student } from '../types';
 
 const AttendanceGate: React.FC = () => {
@@ -89,18 +89,24 @@ const AttendanceGate: React.FC = () => {
       const attendance = await storageService.getAttendance();
       const alreadyMarked = attendance.some(a => a.studentId === studentId && a.date === today);
 
+      const currentMonth = new Date().toISOString().slice(0, 7); 
+      const isPaid = student.lastPaymentMonth >= currentMonth;
+
       if (alreadyMarked) {
-        setStatus('SUCCESS');
-        audioService.speak(`Already marked for ${student.name}`);
+        setStatus(isPaid ? 'SUCCESS' : 'ERROR');
+        audioService.speak(`Attendance already logged for ${student.name}. Status: ${isPaid ? 'Paid' : 'Not Paid'}`);
         setTimeout(() => setStatus('IDLE'), 2000);
         return;
       }
 
-      const currentMonth = new Date().toISOString().slice(0, 7); 
-      if (student.lastPaymentMonth < currentMonth) {
+      if (!isPaid) {
         setStatus('ERROR');
         audioService.playError();
-        audioService.speak("Payment Overdue");
+        // Pronounce loudly as requested
+        const utterance = new SpeechSynthesisUtterance("NOT PAID");
+        utterance.volume = 1.0;
+        utterance.rate = 0.8;
+        window.speechSynthesis.speak(utterance);
         setTimeout(() => setStatus('IDLE'), 4000);
       } else {
         const entryId = await storageService.addAttendance({
@@ -114,7 +120,7 @@ const AttendanceGate: React.FC = () => {
         setRecentRecords(prev => [student, ...prev].slice(0, 5));
         setStatus('SUCCESS');
         audioService.playSuccess();
-        audioService.speak(`Welcome ${student.name}`);
+        audioService.speak("PAID. Welcome.");
         setTimeout(() => setStatus('IDLE'), 2000);
       }
     } else {
@@ -168,21 +174,28 @@ const AttendanceGate: React.FC = () => {
               
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                 <div className={`w-80 h-80 border-4 rounded-[4.5rem] flex items-center justify-center transition-all duration-500 ${
-                  status === 'SUCCESS' ? 'border-emerald-500 scale-110 shadow-[0_0_100px_rgba(16,185,129,0.3)]' : 
-                  status === 'ERROR' ? 'border-rose-500 scale-90 shadow-[0_0_100px_rgba(244,63,94,0.3)]' : 
+                  status === 'SUCCESS' ? 'border-emerald-500 scale-110 shadow-[0_0_100px_rgba(16,185,129,0.3)] bg-emerald-500/10' : 
+                  status === 'ERROR' ? 'border-rose-500 scale-90 shadow-[0_0_100px_rgba(244,63,94,0.3)] bg-rose-500/10' : 
                   'border-white/20'
                 }`}>
-                  <Scan className={`text-white/20 ${status === 'IDLE' ? 'animate-pulse' : ''}`} size={80} />
+                  {status === 'SUCCESS' && <Check className="text-emerald-500" size={120} strokeWidth={4} />}
+                  {status === 'ERROR' && <X className="text-rose-500" size={120} strokeWidth={4} />}
+                  {status === 'IDLE' && <Scan className="text-white/20 animate-pulse" size={80} />}
                 </div>
               </div>
 
-              <div className={`absolute inset-x-0 bottom-0 p-10 flex items-center justify-center text-3xl font-black uppercase tracking-tighter italic backdrop-blur-3xl transition-all duration-700 ${
+              <div className={`absolute inset-x-0 bottom-0 p-10 flex flex-col items-center justify-center text-5xl font-black uppercase tracking-tighter italic backdrop-blur-3xl transition-all duration-700 ${
                 status === 'SUCCESS' ? 'bg-emerald-600/90 text-white translate-y-0' :
                 status === 'ERROR' ? 'bg-rose-600/90 text-white translate-y-0' :
                 'translate-y-full'
               }`}>
-                {status === 'SUCCESS' ? <ShieldCheck className="mr-4" size={32}/> : <AlertCircle className="mr-4" size={32}/>}
-                {status === 'SUCCESS' ? 'VERIFIED' : 'ACCESS DENIED'}
+                <div className="flex items-center">
+                   {status === 'SUCCESS' ? <ShieldCheck className="mr-4" size={48}/> : <AlertCircle className="mr-4" size={48}/>}
+                   {status === 'SUCCESS' ? 'PAID' : 'NOT PAID'}
+                </div>
+                <p className="text-sm tracking-[0.3em] font-black mt-2 opacity-80">
+                   {status === 'SUCCESS' ? 'ACCESS GRANTED' : 'SETTLEMENT REQUIRED'}
+                </p>
               </div>
             </>
           )}

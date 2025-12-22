@@ -14,14 +14,19 @@ const AttendanceGate: React.FC = () => {
 
   useEffect(() => {
     let animationFrameId: number;
+    let stream: MediaStream | null = null;
     
     const startScanner = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } 
+        });
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          videoRef.current.play();
-          requestAnimationFrame(tick);
+          videoRef.current.onloadedmetadata = () => {
+            videoRef.current?.play();
+            requestAnimationFrame(tick);
+          };
         }
       } catch (err) {
         console.error("Camera access denied", err);
@@ -31,7 +36,7 @@ const AttendanceGate: React.FC = () => {
     const tick = () => {
       if (videoRef.current && canvasRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
         const canvas = canvasRef.current;
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
         if (ctx) {
           canvas.height = videoRef.current.videoHeight;
           canvas.width = videoRef.current.videoWidth;
@@ -41,7 +46,7 @@ const AttendanceGate: React.FC = () => {
             inversionAttempts: "dontInvert",
           });
 
-          if (code && code.data && code.data.startsWith('Stu-')) {
+          if (code && code.data && code.data.startsWith('STU-')) {
             handleScan(code.data);
           }
         }
@@ -50,31 +55,39 @@ const AttendanceGate: React.FC = () => {
     };
 
     startScanner();
-    return () => cancelAnimationFrame(animationFrameId);
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      if (stream) {
+        stream.getTracks().forEach(t => t.stop());
+      }
+    };
   }, []);
 
   const handleScan = (studentId: string) => {
+    // Throttling scans
+    if (status !== 'IDLE') return;
+
     const students = storageService.getStudents();
     const student = students.find(s => s.id === studentId);
     
     if (student) {
-      // Check for double scan today
       const today = new Date().toISOString().split('T')[0];
       const attendance = storageService.getAttendance();
       const alreadyMarked = attendance.some(a => a.studentId === studentId && a.date === today);
 
       if (alreadyMarked) {
-        // Just ignore or show minor notification if already scanned
+        setStatus('SUCCESS');
+        audioService.speak(`Already marked for ${student.name}`);
+        setTimeout(() => setStatus('IDLE'), 2000);
         return;
       }
 
-      // Check payment status (e.g., must have paid current month)
-      const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+      const currentMonth = new Date().toISOString().slice(0, 7); 
       if (student.lastPaymentMonth < currentMonth) {
         setStatus('ERROR');
         audioService.playError();
-        audioService.speak("Please pay your monthly fee");
-        setTimeout(() => setStatus('IDLE'), 3000);
+        audioService.speak("Payment Overdue");
+        setTimeout(() => setStatus('IDLE'), 4000);
       } else {
         storageService.addAttendance({
           id: Date.now().toString(),
@@ -86,38 +99,39 @@ const AttendanceGate: React.FC = () => {
         setRecentRecords(prev => [student, ...prev].slice(0, 5));
         setStatus('SUCCESS');
         audioService.playSuccess();
-        audioService.speak(`Welcome ${student.name}`);
+        audioService.speak(`Authorized, welcome ${student.name}`);
         setTimeout(() => setStatus('IDLE'), 2000);
       }
     } else {
       setStatus('ERROR');
       audioService.playError();
-      setTimeout(() => setStatus('IDLE'), 1000);
+      setTimeout(() => setStatus('IDLE'), 1500);
     }
   };
 
   return (
     <div className="max-w-4xl mx-auto space-y-12">
       <header className="text-center">
-        <h1 className="text-5xl font-black tracking-tighter uppercase mb-2">Attendance Gate</h1>
-        <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">Biometric Entry Verification System</p>
+        <h1 className="text-5xl font-black tracking-tighter uppercase mb-2">Smart QR Entry</h1>
+        <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px]">Excellence English Gate Management</p>
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Scanner Feed */}
-        <div className={`relative rounded-[4rem] overflow-hidden border-4 transition-all duration-500 shadow-2xl ${
-          status === 'SUCCESS' ? 'border-emerald-500 shadow-emerald-500/20' : 
-          status === 'ERROR' ? 'border-rose-500 shadow-rose-500/20' : 
+        <div className={`relative rounded-[4rem] overflow-hidden border-4 transition-all duration-500 shadow-2xl bg-slate-900 ${
+          status === 'SUCCESS' ? 'border-emerald-500 shadow-emerald-500/30' : 
+          status === 'ERROR' ? 'border-rose-500 shadow-rose-500/30' : 
           'border-slate-800'
         }`}>
-          <video ref={videoRef} className="w-full h-[400px] object-cover scale-x-[-1]" />
+          <video ref={videoRef} className="w-full h-[450px] object-cover" />
           <canvas ref={canvasRef} className="hidden" />
           
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className={`w-64 h-64 border-2 rounded-[3rem] flex items-center justify-center ${
-              status === 'SUCCESS' ? 'border-emerald-500/50' : 'border-white/20'
+          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+            <div className={`w-72 h-72 border-2 rounded-[4rem] flex items-center justify-center transition-all duration-300 ${
+              status === 'SUCCESS' ? 'border-emerald-500 scale-110' : 
+              status === 'ERROR' ? 'border-rose-500 scale-90' : 
+              'border-white/20'
             }`}>
-              <Scan className={`text-white/20 ${status === 'IDLE' ? 'animate-pulse' : ''}`} size={48} />
+              <Scan className={`text-white/20 ${status === 'IDLE' ? 'animate-pulse' : ''}`} size={64} />
             </div>
           </div>
 
@@ -127,40 +141,42 @@ const AttendanceGate: React.FC = () => {
             'translate-y-full'
           }`}>
             {status === 'SUCCESS' ? <ShieldCheck className="mr-3" /> : <AlertCircle className="mr-3" />}
-            {status === 'SUCCESS' ? 'ACCESS GRANTED' : 'PAYMENT OVERDUE'}
+            {status === 'SUCCESS' ? 'ACCESS GRANTED' : 'OVERDUE NOTICE'}
           </div>
         </div>
 
-        {/* Info & History */}
         <div className="space-y-6">
-          <div className="bg-slate-900/50 p-8 rounded-[3rem] border border-slate-800">
-            <h3 className="text-[10px] font-black tracking-[0.3em] uppercase text-slate-500 mb-6 flex items-center gap-2">
-              <Scan size={14} />
-              Current Status
+          <div className="bg-slate-900/50 p-10 rounded-[3rem] border border-slate-800 shadow-xl">
+            <h3 className="text-[10px] font-black tracking-[0.4em] uppercase text-slate-500 mb-6 flex items-center gap-2">
+              <Scan size={14} className="text-blue-500" />
+              Live Stream Analytics
             </h3>
             {lastStudent ? (
-              <div>
-                <p className="text-4xl font-black tracking-tighter mb-1">{lastStudent}</p>
-                <p className="text-emerald-500 font-bold text-sm">Verified Successfully</p>
+              <div className="animate-in fade-in slide-in-from-left-4">
+                <p className="text-4xl font-black tracking-tighter mb-2 text-white uppercase">{lastStudent}</p>
+                <div className="flex items-center gap-2 text-emerald-500 font-black text-xs uppercase tracking-widest">
+                   <div className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                   Verified Successfully
+                </div>
               </div>
             ) : (
-              <p className="text-2xl font-black text-slate-700 uppercase italic">Waiting for scan...</p>
+              <p className="text-2xl font-black text-slate-700 uppercase italic leading-tight">System Armed.<br />Waiting for PVC Identity.</p>
             )}
           </div>
 
-          <div className="bg-slate-950 p-8 rounded-[3rem] border border-slate-900">
-            <h3 className="text-[10px] font-black tracking-[0.3em] uppercase text-slate-500 mb-6 flex items-center gap-2">
-              <History size={14} />
-              Recent Entry
+          <div className="bg-slate-950 p-10 rounded-[3rem] border border-slate-900 shadow-2xl">
+            <h3 className="text-[10px] font-black tracking-[0.4em] uppercase text-slate-500 mb-6 flex items-center gap-2">
+              <History size={14} className="text-blue-500" />
+              Recent Entries
             </h3>
-            <div className="space-y-4">
+            <div className="space-y-3">
               {recentRecords.length > 0 ? recentRecords.map((r, i) => (
-                <div key={i} className="flex justify-between items-center bg-slate-900 p-4 rounded-2xl">
-                  <span className="font-bold">{r.name}</span>
-                  <span className="text-[10px] bg-slate-800 px-3 py-1 rounded-full text-slate-400 font-black">{r.grade}</span>
+                <div key={i} className="flex justify-between items-center bg-slate-900/50 p-5 rounded-2xl border border-slate-800/50">
+                  <span className="font-black text-slate-200 uppercase">{r.name}</span>
+                  <span className="text-[9px] bg-blue-600 text-white px-3 py-1 rounded-full font-black tracking-widest uppercase">{r.grade}</span>
                 </div>
               )) : (
-                <p className="text-slate-600 text-sm italic">No recent scans</p>
+                <p className="text-slate-600 text-xs italic">Log empty for current session</p>
               )}
             </div>
           </div>

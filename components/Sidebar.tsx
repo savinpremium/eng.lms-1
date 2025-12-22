@@ -8,7 +8,8 @@ import {
   CreditCard, 
   MessageSquare, 
   LogOut,
-  ShieldCheck
+  ShieldCheck,
+  UserPlus
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -19,8 +20,9 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate, onLogout }) => {
   const menuItems = [
-    { page: Page.DASHBOARD, icon: LayoutDashboard, label: 'Dashboard' },
-    { page: Page.STUDENTS, icon: Users, label: 'Students' },
+    { page: Page.DASHBOARD, icon: LayoutDashboard, label: 'Ethics Monitor' },
+    { page: Page.STUDENTS, icon: Users, label: 'Student IDs' },
+    { page: Page.ENROLLMENT, icon: UserPlus, label: 'Enrollment' },
     { page: Page.ATTENDANCE, icon: ScanQrCode, label: 'QR Gate' },
     { page: Page.PAYMENTS, icon: CreditCard, label: 'Payments' },
     { page: Page.MESSENGER, icon: MessageSquare, label: 'AI Messenger' },
@@ -33,8 +35,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate, onLogout }) =
           <ShieldCheck className="text-white" size={24} />
         </div>
         <div>
-          <h1 className="font-black text-xl tracking-tighter uppercase leading-none">EngLMS</h1>
-          <p className="text-[10px] tracking-[0.2em] font-bold text-slate-500 uppercase">Executive Console</p>
+          <h1 className="font-black text-xl tracking-tighter uppercase leading-none text-blue-500">EngLMS</h1>
+          <p className="text-[10px] tracking-[0.2em] font-bold text-slate-500 uppercase">Institutional Console</p>
         </div>
       </div>
 

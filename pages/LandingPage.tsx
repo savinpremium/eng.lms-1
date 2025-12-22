@@ -3,14 +3,14 @@ import React, { useState } from 'react';
 import { Page, Grade, Student } from '../types';
 import { storageService } from '../services/storageService';
 import { audioService } from '../services/audioService';
-import { CheckCircle, ArrowRight, ShieldCheck, QrCode } from 'lucide-react';
+import { CheckCircle, ArrowRight, ShieldCheck, QrCode, Lock, User } from 'lucide-react';
 
 interface LandingPageProps {
   onNavigate: (page: Page) => void;
-  onLogin: () => void;
+  onLoginSuccess: () => void;
 }
 
-const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, onLogin }) => {
+const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, onLoginSuccess }) => {
   const [formData, setFormData] = useState({
     name: '',
     grade: 'Grade 6' as Grade,
@@ -18,19 +18,33 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, onLogin }) => {
     contact: ''
   });
   const [registeredStudent, setRegisteredStudent] = useState<Student | null>(null);
+  const [showLogin, setShowLogin] = useState(false);
+  const [loginForm, setLoginForm] = useState({ username: '', password: '' });
+  const [loginError, setLoginError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
-    const id = `Stu-2025-${Math.floor(1000 + Math.random() * 9000)}`;
+    const year = new Date().getFullYear();
+    const id = `STU-${year}-${Math.floor(1000 + Math.random() * 9000)}`;
     const newStudent: Student = {
       ...formData,
       id,
-      lastPaymentMonth: '2025-01',
+      lastPaymentMonth: `${year}-01`,
       registrationDate: new Date().toISOString().split('T')[0]
     };
     storageService.saveStudent(newStudent);
     setRegisteredStudent(newStudent);
     audioService.playSuccess();
+  };
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (loginForm.username === 'Iresha1978' && loginForm.password === 'Iresha1978') {
+      onLoginSuccess();
+    } else {
+      setLoginError('Invalid credentials');
+      audioService.playError();
+    }
   };
 
   return (
@@ -52,7 +66,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, onLogin }) => {
             Student Portal
           </button>
           <button 
-            onClick={() => { onLogin(); onNavigate(Page.DASHBOARD); }}
+            onClick={() => setShowLogin(true)}
             className="px-6 py-2 rounded-full bg-slate-800 font-bold hover:bg-slate-700 transition-all"
           >
             Staff Login
@@ -63,14 +77,14 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, onLogin }) => {
       {/* Hero Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
         <div>
-          <p className="text-blue-500 font-black tracking-widest uppercase text-sm mb-4">The Future of English Learning</p>
+          <p className="text-blue-500 font-black tracking-widest uppercase text-sm mb-4">Excellence English Institute</p>
           <h1 className="text-6xl md:text-8xl font-black tracking-tighter leading-none mb-6">
-            EXCELLENCE <br />
-            <span className="text-slate-800 outline-text" style={{ WebkitTextStroke: '2px #1e293b' }}>ENGLISH</span>
+            BRIGHTER <br />
+            <span className="text-slate-800 outline-text" style={{ WebkitTextStroke: '2px #1e293b' }}>FUTURES</span>
           </h1>
           <p className="text-xl md:text-3xl font-bold text-slate-400 mb-8 leading-relaxed">
             විශිෂ්ටතම ඉංග්‍රීසි අධ්‍යාපනය දැන් වඩාත් තාක්ෂණිකව. <br />
-            <span className="text-lg">Register your child for the 2025 intake today.</span>
+            <span className="text-lg">Digital attendance, PVC IDs, and AI alerts.</span>
           </p>
           
           <div className="space-y-4">
@@ -86,7 +100,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, onLogin }) => {
         {/* Enrollment Form */}
         <div className="bg-slate-900/50 p-8 md:p-12 rounded-[4rem] border border-slate-800 shadow-2xl shadow-blue-900/10">
           {!registeredStudent ? (
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleRegister} className="space-y-6">
               <h2 className="text-3xl font-black tracking-tight mb-8">STUDENT ENROLLMENT</h2>
               
               <div className="space-y-4">
@@ -94,46 +108,49 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, onLogin }) => {
                   <label className="block text-[10px] font-black tracking-[0.3em] uppercase text-slate-500 mb-2">Student Name</label>
                   <input 
                     required
+                    placeholder="Full Name"
                     className="w-full bg-slate-950 border border-slate-800 rounded-3xl px-6 py-4 focus:outline-none focus:border-blue-600 transition-all"
                     value={formData.name}
                     onChange={(e) => setFormData({...formData, name: e.target.value})}
                   />
                 </div>
                 
-                <div>
-                  <label className="block text-[10px] font-black tracking-[0.3em] uppercase text-slate-500 mb-2">Academic Grade</label>
-                  <select 
-                    className="w-full bg-slate-950 border border-slate-800 rounded-3xl px-6 py-4 focus:outline-none focus:border-blue-600 transition-all appearance-none"
-                    value={formData.grade}
-                    onChange={(e) => setFormData({...formData, grade: e.target.value as Grade})}
-                  >
-                    <option>Grade 6</option>
-                    <option>Grade 7</option>
-                    <option>Grade 8</option>
-                    <option>Grade 9</option>
-                    <option>O/L</option>
-                    <option>A/L</option>
-                  </select>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-black tracking-[0.3em] uppercase text-slate-500 mb-2">Grade</label>
+                    <select 
+                      className="w-full bg-slate-950 border border-slate-800 rounded-3xl px-6 py-4 focus:outline-none focus:border-blue-600 transition-all appearance-none"
+                      value={formData.grade}
+                      onChange={(e) => setFormData({...formData, grade: e.target.value as Grade})}
+                    >
+                      <option>Grade 6</option>
+                      <option>Grade 7</option>
+                      <option>Grade 8</option>
+                      <option>Grade 9</option>
+                      <option>O/L</option>
+                      <option>A/L</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black tracking-[0.3em] uppercase text-slate-500 mb-2">WhatsApp</label>
+                    <input 
+                      required
+                      placeholder="07xxxxxxxx"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-3xl px-6 py-4 focus:outline-none focus:border-blue-600 transition-all"
+                      value={formData.contact}
+                      onChange={(e) => setFormData({...formData, contact: e.target.value})}
+                    />
+                  </div>
                 </div>
 
                 <div>
                   <label className="block text-[10px] font-black tracking-[0.3em] uppercase text-slate-500 mb-2">Parent Name</label>
                   <input 
                     required
+                    placeholder="Guardian Name"
                     className="w-full bg-slate-950 border border-slate-800 rounded-3xl px-6 py-4 focus:outline-none focus:border-blue-600 transition-all"
                     value={formData.parentName}
                     onChange={(e) => setFormData({...formData, parentName: e.target.value})}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-black tracking-[0.3em] uppercase text-slate-500 mb-2">WhatsApp Number</label>
-                  <input 
-                    required
-                    placeholder="07x xxxxxxx"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-3xl px-6 py-4 focus:outline-none focus:border-blue-600 transition-all"
-                    value={formData.contact}
-                    onChange={(e) => setFormData({...formData, contact: e.target.value})}
                   />
                 </div>
               </div>
@@ -148,11 +165,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, onLogin }) => {
               <div className="w-20 h-20 bg-emerald-500/20 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
                 <CheckCircle size={48} />
               </div>
-              <h2 className="text-3xl font-black mb-4 tracking-tight uppercase">Welcome to the Intake</h2>
-              <p className="text-slate-400 font-bold mb-8">Registration Successful. Your Student ID is generated.</p>
+              <h2 className="text-3xl font-black mb-4 tracking-tight uppercase">Successfully Registered</h2>
+              <p className="text-slate-400 font-bold mb-8">Your Student ID has been generated for 2025.</p>
               
               <div className="bg-slate-950 p-6 rounded-3xl border border-blue-900/50 mb-8">
-                <p className="text-[10px] tracking-[0.4em] font-black text-slate-500 mb-1 uppercase">Assigned ID</p>
+                <p className="text-[10px] tracking-[0.4em] font-black text-slate-500 mb-1 uppercase">Official ID</p>
                 <p className="text-4xl font-black text-blue-500 tracking-tighter">{registeredStudent.id}</p>
               </div>
 
@@ -166,6 +183,56 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, onLogin }) => {
           )}
         </div>
       </div>
+
+      {/* Login Modal */}
+      {showLogin && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 backdrop-blur-3xl bg-slate-950/80">
+          <div className="bg-slate-900 w-full max-w-md p-10 rounded-[4rem] border border-slate-800 shadow-3xl text-center space-y-8 animate-in zoom-in duration-300">
+            <div className="w-20 h-20 bg-blue-600/10 text-blue-500 rounded-full flex items-center justify-center mx-auto">
+              <Lock size={40} />
+            </div>
+            <div>
+              <h4 className="text-3xl font-black tracking-tighter uppercase">Staff Access</h4>
+              <p className="text-slate-500 font-bold italic text-sm">Restricted to authorized institute personnel.</p>
+            </div>
+            
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="relative">
+                <User className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-500" size={20} />
+                <input 
+                  className="w-full bg-slate-950 border border-slate-800 rounded-3xl px-14 py-4 focus:outline-none focus:border-blue-600"
+                  placeholder="Username"
+                  value={loginForm.username}
+                  onChange={(e) => setLoginForm({...loginForm, username: e.target.value})}
+                />
+              </div>
+              <div className="relative">
+                <Lock className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-500" size={20} />
+                <input 
+                  type="password"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-3xl px-14 py-4 focus:outline-none focus:border-blue-600"
+                  placeholder="Password"
+                  value={loginForm.password}
+                  onChange={(e) => setLoginForm({...loginForm, password: e.target.value})}
+                />
+              </div>
+              {loginError && <p className="text-rose-500 font-bold text-xs">{loginError}</p>}
+              <button 
+                className="w-full bg-blue-600 text-white py-5 rounded-3xl font-black uppercase tracking-tighter text-xl hover:bg-blue-500 transition-all"
+              >
+                AUTHORIZE
+              </button>
+              <button 
+                type="button"
+                onClick={() => setShowLogin(false)}
+                className="text-slate-500 font-bold uppercase text-sm tracking-widest mt-4"
+              >
+                CANCEL
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

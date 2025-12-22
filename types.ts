@@ -2,7 +2,7 @@
 export type Grade = 'Grade 6' | 'Grade 7' | 'Grade 8' | 'Grade 9' | 'O/L' | 'A/L';
 
 export interface Student {
-  id: string; // Stu-2025-XXXX
+  id: string; // STU-2025-XXXX
   name: string;
   grade: Grade;
   parentName: string;
@@ -41,5 +41,6 @@ export enum Page {
   STUDENTS = 'STUDENTS',
   ATTENDANCE = 'ATTENDANCE',
   PAYMENTS = 'PAYMENTS',
-  MESSENGER = 'MESSENGER'
+  MESSENGER = 'MESSENGER',
+  ENROLLMENT = 'ENROLLMENT'
 }

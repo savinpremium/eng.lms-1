@@ -1,9 +1,22 @@
-
 import { GoogleGenAI } from "@google/genai";
 import { Student } from "../types";
 
+// Safe access to environment variables
+const getApiKey = () => {
+  try {
+    return (typeof process !== 'undefined' && process.env && process.env.API_KEY) || '';
+  } catch (e) {
+    return '';
+  }
+};
+
 export const generateWhatsAppDraft = async (student: Student, type: 'payment' | 'absence' | 'general'): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    return "Error: API key not configured. Please check environment variables.";
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
   
   const prompt = `
     Generate a professional and friendly WhatsApp message for the parent of a student in an English language institute in Sri Lanka.

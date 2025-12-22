@@ -1,4 +1,3 @@
-
 import React, { useMemo } from 'react';
 import { storageService } from '../services/storageService';
 import { 
@@ -46,7 +45,7 @@ const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="space-y-12">
+    <div className="space-y-12 pb-20">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-5xl font-black tracking-tighter uppercase">Executive Monitor</h1>
@@ -83,14 +82,14 @@ const Dashboard: React.FC = () => {
       {/* Distribution Chart */}
       <div className="bg-slate-900/30 border border-slate-800 p-10 rounded-[5rem]">
         <h3 className="text-2xl font-black mb-8 tracking-tight uppercase">Student Distribution</h3>
-        <div className="h-[400px]">
+        <div className="h-[400px] w-full min-h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData}>
+            <BarChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
               <XAxis 
                 dataKey="name" 
                 axisLine={false} 
                 tickLine={false} 
-                tick={{ fill: '#64748b', fontWeight: 'bold' }} 
+                tick={{ fill: '#64748b', fontWeight: 'bold', fontSize: 12 }} 
               />
               <YAxis hide />
               <Tooltip 
@@ -99,7 +98,9 @@ const Dashboard: React.FC = () => {
                   backgroundColor: '#020617', 
                   borderColor: '#1e293b', 
                   borderRadius: '1rem',
-                  color: 'white'
+                  color: 'white',
+                  border: 'none',
+                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
                 }}
               />
               <Bar dataKey="count" radius={[20, 20, 20, 20]}>

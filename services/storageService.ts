@@ -23,8 +23,17 @@ export const storageService = {
   saveInstitution: async (inst: Institution) => {
     const instRef = inst.id ? ref(db, `institutions/${inst.id}`) : push(ref(db, 'institutions'));
     const id = inst.id || instRef.key as string;
-    await set(ref(db, `institutions/${id}`), { ...inst, id });
+    await set(ref(db, `institutions/${id}`), { ...inst, id, status: inst.status || 'Active' });
     return id;
+  },
+
+  updateInstitution: async (id: string, updates: Partial<Institution>) => {
+    await update(ref(db, `institutions/${id}`), updates);
+  },
+
+  deleteInstitution: async (id: string) => {
+    await remove(ref(db, `institutions/${id}`));
+    // In a production app, we would also clean up data/instId here
   },
 
   getInstitution: async (id: string): Promise<Institution | null> => {
@@ -43,7 +52,13 @@ export const storageService = {
     const snap = await get(ref(db, 'institutions'));
     if (!snap.exists()) return null;
     const insts = Object.values(snap.val()) as Institution[];
-    return insts.find(i => i.email === email && i.password === pass) || null;
+    const inst = insts.find(i => i.email === email && i.password === pass);
+    
+    if (inst && inst.status === 'Suspended') {
+      throw new Error("This account has been suspended by the network administrator.");
+    }
+    
+    return inst || null;
   },
 
   // --- SCOPED DATA (Requires institutionId) ---

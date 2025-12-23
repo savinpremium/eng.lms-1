@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { storageService, auth } from '../services/storageService';
 import { audioService } from '../services/audioService';
-import { Institution, Tier, PaymentMode } from '../types';
+import { Institution, Tier, PaymentMode, InstitutionStatus } from '../types';
 import { 
   Plus, 
   ShieldCheck, 
@@ -23,13 +23,22 @@ import {
   ChevronRight,
   ShieldAlert,
   Briefcase,
-  Scale
+  Scale,
+  Settings2,
+  Lock,
+  Unlock,
+  Trash2,
+  Snowflake,
+  Activity,
+  // Fix: Added missing 'Layers' import
+  Layers
 } from 'lucide-react';
 import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from "firebase/auth";
 
 const SuperAdminDesk: React.FC = () => {
   const [institutes, setInstitutes] = useState<Institution[]>([]);
   const [showAdd, setShowAdd] = useState(false);
+  const [showManage, setShowManage] = useState<Institution | null>(null);
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
   const [isVerifying, setIsVerifying] = useState(false);
   const [otpCode, setOtpCode] = useState('');
@@ -40,7 +49,7 @@ const SuperAdminDesk: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
 
-  const [formData, setFormData] = useState<Omit<Institution, 'id' | 'createdAt' | 'digitalSignature' | 'termsAccepted'>>({
+  const [formData, setFormData] = useState<Omit<Institution, 'id' | 'createdAt' | 'digitalSignature' | 'termsAccepted' | 'status'>>({
     name: '',
     email: '',
     password: '',
@@ -118,6 +127,7 @@ const SuperAdminDesk: React.FC = () => {
         ...formData, 
         digitalSignature: signatureData,
         termsAccepted: true,
+        status: 'Active',
         id: '', 
         createdAt: Date.now() 
       } as Institution);
@@ -129,6 +139,28 @@ const SuperAdminDesk: React.FC = () => {
       alert("Deployment Error: " + e.message);
     } finally {
       setIsVerifying(false);
+    }
+  };
+
+  const handleUpdateStatus = async (id: string, status: InstitutionStatus) => {
+    if (!confirm(`Are you sure you want to change node status to ${status}?`)) return;
+    try {
+      await storageService.updateInstitution(id, { status });
+      setShowManage(null);
+      audioService.playSuccess();
+    } catch (e: any) {
+      alert("Update failed: " + e.message);
+    }
+  };
+
+  const handleDeleteInstitution = async (id: string) => {
+    if (!confirm("CRITICAL WARNING: This will permanently delete the institution node and all associated configuration. Data destruction is irreversible. Proceed?")) return;
+    try {
+      await storageService.deleteInstitution(id);
+      setShowManage(null);
+      audioService.playError();
+    } catch (e: any) {
+      alert("Deletion failed: " + e.message);
     }
   };
 
@@ -209,16 +241,29 @@ const SuperAdminDesk: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 p-4">
         {institutes.map(inst => (
-          <div key={inst.id} className="bg-slate-900 border-2 border-slate-800 p-10 rounded-[4.5rem] shadow-3xl group relative overflow-hidden h-full flex flex-col justify-between hover:border-blue-500/40 transition-all">
+          <div key={inst.id} className={`bg-slate-900 border-2 p-10 rounded-[4.5rem] shadow-3xl group relative overflow-hidden h-full flex flex-col justify-between transition-all ${
+            inst.status === 'Suspended' ? 'border-rose-500/50 opacity-60' : 
+            inst.status === 'Frozen' ? 'border-amber-500/50' : 
+            'border-slate-800 hover:border-blue-500/40'
+          }`}>
             <div className="space-y-6">
               <div className="flex justify-between items-start">
-                <span className={`text-[9px] font-black uppercase tracking-[0.3em] px-5 py-2 rounded-full border ${
-                  inst.tier === 'Golden' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' : 
-                  inst.tier === 'Platinum' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' : 
-                  'bg-slate-500/10 text-slate-500 border-slate-500/20'
-                }`}>
-                  {inst.tier} • {inst.paymentMode === 'OneTime' ? 'OWNED' : 'SUBSCRIPTION'}
-                </span>
+                <div className="flex flex-col gap-2">
+                   <span className={`text-[9px] font-black uppercase tracking-[0.3em] px-5 py-2 rounded-full border w-fit ${
+                    inst.tier === 'Golden' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' : 
+                    inst.tier === 'Platinum' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' : 
+                    'bg-slate-500/10 text-slate-500 border-slate-500/20'
+                  }`}>
+                    {inst.tier} • {inst.paymentMode === 'OneTime' ? 'OWNED' : 'SUBSCRIPTION'}
+                  </span>
+                  <span className={`text-[7px] font-black uppercase tracking-[0.4em] px-3 py-1 rounded-full border w-fit ${
+                    inst.status === 'Active' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 
+                    inst.status === 'Frozen' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' : 
+                    'bg-rose-500/10 text-rose-500 border-rose-500/20'
+                  }`}>
+                    {inst.status}
+                  </span>
+                </div>
                 <p className="text-[10px] font-bold text-slate-600 font-mono">ID: {inst.id}</p>
               </div>
               <h3 className="text-4xl font-black uppercase italic tracking-tighter text-white leading-none">{inst.name}</h3>
@@ -233,12 +278,85 @@ const SuperAdminDesk: React.FC = () => {
                 </div>
               </div>
             </div>
-            <button className="w-full mt-8 py-4 bg-slate-950 border border-slate-800 rounded-2xl font-black uppercase text-[9px] tracking-[0.3em] text-slate-500 hover:text-white transition-all">
+            <button onClick={() => setShowManage(inst)} className="w-full mt-8 py-4 bg-slate-950 border border-slate-800 rounded-2xl font-black uppercase text-[9px] tracking-[0.3em] text-slate-500 hover:text-white transition-all flex items-center justify-center gap-2">
+              <Settings2 size={14} />
               Manage Node Terminal
             </button>
           </div>
         ))}
       </div>
+
+      {/* MANAGE INSTITUTION MODAL */}
+      {showManage && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 backdrop-blur-3xl bg-slate-950/90 overflow-y-auto">
+          <div className="bg-slate-900 w-full max-w-lg rounded-[4rem] border border-slate-800 shadow-3xl p-12 space-y-10 animate-in zoom-in duration-300">
+            <div className="flex justify-between items-start">
+               <div>
+                  <h4 className="text-3xl font-black tracking-tighter uppercase italic text-white leading-none">{showManage.name}</h4>
+                  <p className="text-slate-500 font-bold uppercase text-[9px] tracking-[0.4em] mt-2">ID: {showManage.id} • Node Control Panel</p>
+               </div>
+               <button onClick={() => setShowManage(null)} className="text-slate-500 hover:text-white transition-colors"><X size={28} /></button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4">
+               <div className="bg-slate-950 p-6 rounded-3xl border border-slate-800 space-y-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-600 flex items-center gap-2">
+                    <Activity size={12} className="text-blue-500" />
+                    Network Governance
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                     <button 
+                        onClick={() => handleUpdateStatus(showManage.id, showManage.status === 'Active' ? 'Suspended' : 'Active')}
+                        className={`py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${
+                          showManage.status === 'Suspended' ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white shadow-xl shadow-rose-600/20'
+                        }`}
+                      >
+                        {showManage.status === 'Suspended' ? <Unlock size={14} /> : <Lock size={14} />}
+                        {showManage.status === 'Suspended' ? 'Unsuspend' : 'Suspend'}
+                      </button>
+                      <button 
+                        onClick={() => handleUpdateStatus(showManage.id, showManage.status === 'Frozen' ? 'Active' : 'Frozen')}
+                        className={`py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${
+                          showManage.status === 'Frozen' ? 'bg-emerald-600 text-white' : 'bg-amber-600 text-white shadow-xl shadow-amber-600/20'
+                        }`}
+                      >
+                        {showManage.status === 'Frozen' ? <Activity size={14} /> : <Snowflake size={14} />}
+                        {showManage.status === 'Frozen' ? 'Unfreeze' : 'Freeze Node'}
+                      </button>
+                  </div>
+               </div>
+
+               <div className="bg-slate-950 p-6 rounded-3xl border border-slate-800 space-y-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-600 flex items-center gap-2">
+                    <Layers size={12} className="text-blue-500" />
+                    Infrastructure Tiering
+                  </p>
+                  <div className="grid grid-cols-3 gap-2">
+                     {(['Lite', 'Platinum', 'Golden'] as Tier[]).map(t => (
+                        <button 
+                          key={t}
+                          onClick={() => storageService.updateInstitution(showManage.id, { tier: t }).then(() => setShowManage(null))}
+                          className={`py-3 rounded-xl text-[8px] font-black uppercase tracking-widest border transition-all ${showManage.tier === t ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-900 border-slate-800 text-slate-500'}`}
+                        >
+                          {t}
+                        </button>
+                     ))}
+                  </div>
+               </div>
+            </div>
+
+            <div className="pt-6 border-t border-slate-800">
+               <button 
+                onClick={() => handleDeleteInstitution(showManage.id)}
+                className="w-full py-5 bg-slate-950 text-rose-500 hover:bg-rose-500 hover:text-white rounded-3xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-3 transition-all border border-rose-500/20"
+               >
+                 <Trash2 size={16} />
+                 Permanent Node Destruction
+               </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showAdd && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 backdrop-blur-3xl bg-slate-950/95 overflow-y-auto">

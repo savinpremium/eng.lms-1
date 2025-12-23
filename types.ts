@@ -6,6 +6,7 @@ export type Grade =
 
 export type Tier = 'Lite' | 'Platinum' | 'Golden';
 export type PaymentMode = 'Subscription' | 'OneTime';
+export type InstitutionStatus = 'Active' | 'Suspended' | 'Frozen';
 
 export interface Institution {
   id: string;
@@ -20,6 +21,7 @@ export interface Institution {
   termsAccepted: boolean;
   tier: Tier;
   paymentMode: PaymentMode;
+  status: InstitutionStatus;
   subjects: string[];
   location: string;
   createdAt: number;

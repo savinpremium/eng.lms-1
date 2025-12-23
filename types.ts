@@ -5,6 +5,7 @@ export type Grade =
   | 'Grade 11';
 
 export type Tier = 'Lite' | 'Platinum' | 'Golden';
+export type PaymentMode = 'Subscription' | 'OneTime';
 
 export interface Institution {
   id: string;
@@ -12,7 +13,13 @@ export interface Institution {
   email: string;
   password: string;
   ownerPhone: string;
+  ownerNIC: string;
+  registrationNumber: string;
+  address: string;
+  digitalSignature: string; // Base64 data
+  termsAccepted: boolean;
   tier: Tier;
+  paymentMode: PaymentMode;
   subjects: string[];
   location: string;
   createdAt: number;
@@ -49,7 +56,6 @@ export interface PaymentRecord {
   timestamp: number;
 }
 
-// Added missing ClassGroup interface
 export interface ClassGroup {
   id: string;
   name: string;
@@ -58,7 +64,6 @@ export interface ClassGroup {
   description?: string;
 }
 
-// Added missing ResultRecord interface
 export interface ResultRecord {
   id: string;
   studentId: string;
@@ -68,7 +73,6 @@ export interface ResultRecord {
   date: string;
 }
 
-// Added missing MaterialRecord interface
 export interface MaterialRecord {
   id: string;
   title: string;
@@ -79,7 +83,6 @@ export interface MaterialRecord {
   date: string;
 }
 
-// Added missing MessageLog interface
 export interface MessageLog {
   id: string;
   studentId: string;
@@ -90,7 +93,6 @@ export interface MessageLog {
   timestamp: number;
 }
 
-// Added missing ScheduleRecord interface
 export interface ScheduleRecord {
   id: string;
   grade: Grade;

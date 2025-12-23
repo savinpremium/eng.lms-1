@@ -5,7 +5,11 @@ import { generateWhatsAppDraft, MessageType } from '../services/geminiService';
 import { Student, ClassGroup } from '../types';
 import { MessageSquare, Send, Sparkles, Copy, Trash2, User, Search, Loader2, BookOpen, AlertTriangle, Users } from 'lucide-react';
 
-const AIMessenger: React.FC = () => {
+interface AIMessengerProps {
+  institutionId: string;
+}
+
+const AIMessenger: React.FC<AIMessengerProps> = ({ institutionId }) => {
   const [students, setStudents] = useState<Student[]>([]);
   const [classes, setClasses] = useState<ClassGroup[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
@@ -16,9 +20,9 @@ const AIMessenger: React.FC = () => {
   const [customPrompt, setCustomPrompt] = useState('');
 
   useEffect(() => {
-    storageService.listenStudents(setStudents);
-    storageService.listenClasses(setClasses);
-  }, []);
+    storageService.listenStudents(institutionId, setStudents);
+    storageService.listenClasses(institutionId, setClasses);
+  }, [institutionId]);
 
   const filtered = students.filter(s => 
     s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -55,9 +59,10 @@ const AIMessenger: React.FC = () => {
     const phone = selectedStudent ? selectedStudent.contact.replace(/\D/g, '') : '';
     const encodedText = encodeURIComponent(draft);
     
-    if (selectedClass && selectedClass.waLink) {
-      window.open(selectedClass.waLink, '_blank');
-      return;
+    // Check if selecting a class (placeholder logic for group broadcast)
+    if (selectedClass) {
+        // Just alerting for now as real WA group links need configuration
+        alert("Preparing Broadcast for " + selectedClass.name);
     }
 
     const waPhone = phone.startsWith('0') ? '94' + phone.substring(1) : phone;

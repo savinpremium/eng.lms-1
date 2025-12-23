@@ -4,15 +4,20 @@ import { storageService } from '../services/storageService';
 import { Student, MessageLog } from '../types';
 import { History, Search, Filter, MessageSquare, Phone, CheckCircle, XCircle, Clock } from 'lucide-react';
 
-const CommLogs: React.FC = () => {
+interface CommLogsProps {
+  institutionId: string;
+}
+
+const CommLogs: React.FC<CommLogsProps> = ({ institutionId }) => {
   const [logs, setLogs] = useState<MessageLog[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    storageService.listenLogs(setLogs);
-    storageService.listenStudents(setStudents);
-  }, []);
+    // Scoped multi-tenant listeners
+    storageService.listenLogs(institutionId, setLogs);
+    storageService.listenStudents(institutionId, setStudents);
+  }, [institutionId]);
 
   const getStudentName = (id: string) => {
     const s = students.find(stud => stud.id === id);

@@ -5,7 +5,12 @@ import { Student } from '../types';
 import { Search, CreditCard, ChevronLeft, X, Loader2, User, QrCode } from 'lucide-react';
 import { audioService } from '../services/audioService';
 
-const StudentPortal: React.FC<{ onBack: () => void }> = ({ onBack }) => {
+interface StudentPortalProps {
+  institutionId: string;
+  onBack: () => void;
+}
+
+const StudentPortal: React.FC<StudentPortalProps> = ({ institutionId, onBack }) => {
   const [searchId, setSearchId] = useState('');
   const [student, setStudent] = useState<Student | null>(null);
   const [authCode, setAuthCode] = useState('');
@@ -16,7 +21,8 @@ const StudentPortal: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     if (!id.trim()) return;
     setIsSearching(true);
     try {
-      const studentsList = await storageService.getStudents();
+      // Scoped student lookup
+      const studentsList = await storageService.getStudents(institutionId);
       const found = studentsList.find(s => s.id.toUpperCase() === id.trim().toUpperCase());
       if (found) {
         setStudent(found);
@@ -35,7 +41,8 @@ const StudentPortal: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   };
 
   const handleOfficePay = async () => {
-    const isValid = await storageService.validateOTP(authCode);
+    // Scoped OTP validation
+    const isValid = await storageService.validateOTP(institutionId, authCode);
     if (isValid) {
       alert("Authorization Verified. Please proceed to the office desk.");
       setShowPayModal(false);

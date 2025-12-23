@@ -17,50 +17,34 @@ export const generateWhatsAppDraft = async (
   student: Student | null, 
   type: MessageType, 
   customInput?: string,
-  classObj?: ClassGroup
+  classObj?: ClassGroup,
+  institutionName?: string
 ): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
-  const prompt = `
-    You are the Head Teacher and Parent Relations Manager at "Excellence English" Sri Lanka.
-    Your objective is to communicate clearly but with extreme warmth, respect, and a human touch.
+  const instName = institutionName || "Smart Campus";
+  
+  const prompt = `You are the Administrative Office at "${instName}". Compose a warm, professional, bilingual (English and Sinhala) message for parents.
+Institution: ${instName}
+Target: ${student ? `${student.name} (${student.id})` : (classObj ? `Class Batch: ${classObj.name}` : 'Parent')}
+Category: ${type.toUpperCase()}
+Note: ${customInput || 'Standard institutional update'}
 
-    STRICT VOCABULARY RULES:
-    1. PROHIBITED TERMS: "Billing Cycle", "Arrears", "Debt", "Transaction", "Overdue", "Settlement", "Ledger", "Protocol".
-    2. REQUIRED TERMS: "Monthly Class Fee", "Class Contribution", "Lesson Fee", "Class Update".
-    3. Use phrases like: "We hope this finds you well", "We kindly appreciate your support", "It is a joy to teach ${student?.name || 'your child'}".
-
-    BILINGUAL ENFORCEMENT:
-    - You MUST provide an English version first.
-    - Follow it immediately with a natural, polite Sinhala (සිංහල) translation.
-
-    CONTEXT:
-    - Institute: Excellence English
-    - Target: ${student ? `${student.name} (${student.id})` : (classObj ? `Class: ${classObj.name}` : 'All Parents')}
-    - Category: ${type.toUpperCase()}
-    ${customInput ? `- Staff rough notes to refine: "${customInput}"` : ''}
-
-    MESSAGE LOGIC PER CATEGORY:
-    - payment_received: Confirm reception of the monthly class fee for ${student?.lastPaymentMonth || 'this month'}. Express gratitude for supporting their child's education.
-    - payment_late: A very gentle, soft reminder that the monthly class fee for ${student?.name || 'the student'} has not been updated in our records yet. Ask if they need any assistance.
-    - class_notes: Based on rough notes, write a friendly summary of what was taught today. End with encouragement.
-    - custom: Take the rough staff input and expand it into a beautiful, polite, bilingual official notice.
-
-    FORMATTING:
-    - No markdown (** or ##).
-    - Clear spacing between English and Sinhala.
-    - Header: "EXCELLENCE ENGLISH - FAMILY UPDATE"
-    - Footer: "Excellence English Office | 077 123 4567 | Thank you / ස්තුතියි"
-  `;
+Rules:
+1. No technical jargon like "Billing" or "Arrears". Use "Monthly Class Dues" or "Attendance Update".
+2. Be extremely polite and reassuring. English first, then Sinhala.
+3. No markdown symbols like ** or ##.
+4. Branding: SmartClass.lk System.
+5. Footer: ${instName} Office | System Powered by SmartClass.lk`;
 
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: prompt,
+      contents: prompt.trim(),
     });
-    return response.text || "I'm sorry, I couldn't compose that message right now. Please try a manual draft.";
+    return response.text || "Composition unavailable. Please draft manually.";
   } catch (error) {
-    console.error("Gemini Error:", error);
-    return "EXCELLENCE ENGLISH\n\nWe are currently experiencing a system update. Please contact the office for any assistance.\n\nThank you for your patience.";
+    console.error("Gemini RPC Error:", error);
+    return `${instName.toUpperCase()}\n\nSystem is currently processing. Please contact the office for assistance.\n\nස්තුතියි.\nPowered by SmartClass.lk`;
   }
 };

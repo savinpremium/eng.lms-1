@@ -4,7 +4,11 @@ import { storageService } from '../services/storageService';
 import { ScheduleRecord, Grade } from '../types';
 import { Calendar, Clock, MapPin, Plus, Trash2, X } from 'lucide-react';
 
-const ScheduleDesk: React.FC = () => {
+interface ScheduleDeskProps {
+  institutionId: string;
+}
+
+const ScheduleDesk: React.FC<ScheduleDeskProps> = ({ institutionId }) => {
   const [schedules, setSchedules] = useState<ScheduleRecord[]>([]);
   const [showAdd, setShowAdd] = useState(false);
   const [newSch, setNewSch] = useState<Omit<ScheduleRecord, 'id'>>({
@@ -15,18 +19,21 @@ const ScheduleDesk: React.FC = () => {
   });
 
   useEffect(() => {
-    return storageService.listenSchedules(setSchedules);
-  }, []);
+    // Scoped multi-tenant listener
+    return storageService.listenSchedules(institutionId, setSchedules);
+  }, [institutionId]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    await storageService.saveSchedule({ ...newSch, id: '' });
+    // Scoped saveSchedule call
+    await storageService.saveSchedule(institutionId, { ...newSch, id: '' } as ScheduleRecord);
     setShowAdd(false);
   };
 
   const handleDelete = async (id: string) => {
     if (confirm("Delete this schedule entry?")) {
-      await storageService.deleteSchedule(id);
+      // Scoped deleteSchedule call
+      await storageService.deleteSchedule(institutionId, id);
     }
   };
 

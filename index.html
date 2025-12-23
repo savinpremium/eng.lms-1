@@ -3,8 +3,8 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>EngLMS | Excellence English</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>SmartClass.lk | System Hub</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -17,6 +17,7 @@
         color: white;
         margin: 0;
         -webkit-font-smoothing: antialiased;
+        overflow-x: hidden;
       }
       ::-webkit-scrollbar { width: 6px; }
       ::-webkit-scrollbar-track { background: #020617; }
@@ -31,10 +32,22 @@
         background: transparent;
       }
 
-      /* HTML5 QR Code overrides to match aesthetic */
+      /* Fixes for mobile camera aspect ratio */
       #qr-reader-attendance video, #qr-reader-payment video {
-        border-radius: 4rem !important;
+        border-radius: 2rem !important;
         object-fit: cover !important;
+        width: 100% !important;
+        height: 100% !important;
+      }
+      
+      /* Scale PVC preview for small screens */
+      .id-preview-container {
+        transform-origin: center;
+      }
+      @media (max-width: 640px) {
+        .id-preview-container {
+          transform: scale(0.5);
+        }
       }
 
       @media print {
@@ -70,6 +83,7 @@
     "recharts": "https://esm.sh/recharts@^3.6.0",
     "firebase/app": "https://www.gstatic.com/firebasejs/11.3.1/firebase-app.js",
     "firebase/database": "https://www.gstatic.com/firebasejs/11.3.1/firebase-database.js",
+    "firebase/auth": "https://www.gstatic.com/firebasejs/11.3.1/firebase-auth.js",
     "firebase/": "https://www.gstatic.com/firebasejs/11.3.1/",
     "html-to-image": "https://esm.sh/html-to-image@^1.11.11"
   }

@@ -5,7 +5,13 @@ import { storageService } from '../services/storageService';
 import { audioService } from '../services/audioService';
 import { UserPlus, ArrowRight, ShieldCheck, CheckCircle, MessageSquare } from 'lucide-react';
 
-const Enrollment: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
+interface EnrollmentProps {
+  institutionId: string;
+  institutionName?: string;
+  onComplete: () => void;
+}
+
+const Enrollment: React.FC<EnrollmentProps> = ({ institutionId, institutionName, onComplete }) => {
   const [formData, setFormData] = useState({
     name: '',
     grade: 'Grade 1' as Grade,
@@ -19,15 +25,23 @@ const Enrollment: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
     e.preventDefault();
     setLoading(true);
     
-    const id = `STU-2025-${Math.floor(1000 + Math.random() * 9000)}`;
+    // Generate Prefix from Institution Name (e.g., "Oxford Academy" -> "OXFORD")
+    const prefix = institutionName 
+      ? institutionName.split(' ')[0].toUpperCase().substring(0, 8)
+      : 'STU';
+      
+    const randomCode = Math.floor(1000 + Math.random() * 9000);
+    const id = `${prefix}-2025-${randomCode}`;
+    
     const newStudent: Student = {
       ...formData,
       id,
+      institutionId,
       lastPaymentMonth: '2024-12',
       registrationDate: new Date().toISOString().split('T')[0]
     };
     
-    await storageService.saveStudent(newStudent);
+    await storageService.saveStudent(institutionId, newStudent);
     audioService.playSuccess();
     setLoading(false);
     setSuccessStudent(newStudent);
@@ -37,7 +51,7 @@ const Enrollment: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
     if (!successStudent) return;
     const phone = successStudent.contact.replace(/\D/g, '');
     const waPhone = phone.startsWith('0') ? '94' + phone.substring(1) : phone;
-    const text = encodeURIComponent(`Hello ${successStudent.parentName}, registration confirmed at Excellence English. Student ID: ${successStudent.id}.`);
+    const text = encodeURIComponent(`Hello ${successStudent.parentName}, registration confirmed at ${institutionName || 'the campus'}. Student ID: ${successStudent.id}. Powered by SmartClass.lk`);
     window.open(`https://wa.me/${waPhone}?text=${text}`, '_blank');
   };
 
@@ -51,7 +65,7 @@ const Enrollment: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
             <CheckCircle size={56} />
           </div>
           <div>
-            <h2 className="text-3xl md:text-5xl font-black tracking-tighter uppercase italic text-white leading-none">Registration Confirmed</h2>
+            <h2 className="text-3xl md:text-5xl font-black tracking-tighter uppercase italic text-white leading-none">Enrollment Verified</h2>
             <p className="text-slate-400 font-bold mt-4 uppercase text-[10px] tracking-widest">Digital Registry Updated</p>
           </div>
 
@@ -60,13 +74,13 @@ const Enrollment: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
                <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${successStudent.id}`} alt="ID QR" className="w-32 h-32" />
              </div>
              <div className="text-left">
-               <p className="text-[10px] font-black tracking-[0.5em] text-slate-600 uppercase mb-2">Personnel Identifier</p>
+               <p className="text-[10px] font-black tracking-[0.5em] text-slate-600 uppercase mb-2">Institutional Personnel Identifier</p>
                <p className="text-5xl font-black text-blue-500 tracking-tighter">{successStudent.id}</p>
              </div>
           </div>
 
           <div className="flex flex-col md:flex-row gap-4 justify-center">
-            <button onClick={handleShareWhatsApp} className="bg-emerald-600 hover:bg-emerald-500 text-white px-10 py-5 rounded-2xl font-black flex items-center justify-center gap-4 transition-all shadow-xl uppercase text-xs border-b-4 border-emerald-800">
+            <button onClick={handleShareWhatsApp} className="bg-emerald-600 hover:bg-emerald-500 text-white px-10 py-5 rounded-2xl font-black flex items-center justify-center gap-4 transition-all shadow-xl uppercase text-xs border-b-4 border-emerald-800 active:translate-y-1 active:border-b-0">
               <MessageSquare size={20} />
               Share Notification
             </button>
@@ -74,6 +88,8 @@ const Enrollment: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
               Registry Home
             </button>
           </div>
+          
+          <p className="text-[8px] font-black uppercase text-slate-700 tracking-[0.4em]">Powered by SmartClass.lk Systems</p>
         </div>
       </div>
     );
@@ -82,8 +98,8 @@ const Enrollment: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
   return (
     <div className="max-w-4xl mx-auto space-y-12 pb-20">
       <header className="animate-in fade-in slide-in-from-top-4 duration-500">
-        <h1 className="text-4xl md:text-6xl font-black tracking-tighter uppercase italic leading-none text-white">Register</h1>
-        <p className="text-slate-500 font-bold uppercase tracking-[0.6em] text-[10px] mt-3">Institutional Provisioning Desk</p>
+        <h1 className="text-4xl md:text-6xl font-black tracking-tighter uppercase italic leading-none text-white">Registry</h1>
+        <p className="text-slate-500 font-bold uppercase tracking-[0.6em] text-[10px] mt-3">Personnel Provisioning Desk | {institutionName}</p>
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 animate-in slide-in-from-bottom-8 duration-700">
@@ -92,11 +108,11 @@ const Enrollment: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
               <div className="space-y-3">
                 <label className="block text-xs font-black tracking-[0.5em] uppercase text-slate-600">Student Name</label>
-                <input required className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-6 py-5 focus:border-blue-600 focus:outline-none font-bold text-xl shadow-inner text-white" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+                <input required className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-6 py-5 focus:border-blue-600 focus:outline-none font-bold text-xl shadow-inner text-white uppercase" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
               </div>
               <div className="space-y-3">
                 <label className="block text-xs font-black tracking-[0.5em] uppercase text-slate-600">Grade Level</label>
-                <select className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-6 py-5 focus:border-blue-600 focus:outline-none font-bold text-xl shadow-inner text-white" value={formData.grade} onChange={e => setFormData({...formData, grade: e.target.value as Grade})}>
+                <select className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-6 py-5 focus:border-blue-600 focus:outline-none font-bold text-xl shadow-inner text-white appearance-none" value={formData.grade} onChange={e => setFormData({...formData, grade: e.target.value as Grade})}>
                   {grades.map(g => <option key={g} value={g}>{g}</option>)}
                 </select>
               </div>
@@ -109,11 +125,11 @@ const Enrollment: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
               </div>
               <div className="space-y-3">
                 <label className="block text-xs font-black tracking-[0.5em] uppercase text-slate-600">Guardian Name</label>
-                <input required className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-6 py-5 focus:border-blue-600 focus:outline-none font-bold text-xl shadow-inner text-white" value={formData.parentName} onChange={e => setFormData({...formData, parentName: e.target.value})} />
+                <input required className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-6 py-5 focus:border-blue-600 focus:outline-none font-bold text-xl shadow-inner text-white uppercase" value={formData.parentName} onChange={e => setFormData({...formData, parentName: e.target.value})} />
               </div>
             </div>
 
-            <button disabled={loading} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-8 rounded-[3rem] flex items-center justify-center gap-5 transition-all shadow-2xl shadow-blue-600/20 uppercase tracking-tighter text-2xl border-b-8 border-blue-800">
+            <button disabled={loading} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-8 rounded-[3rem] flex items-center justify-center gap-5 transition-all shadow-2xl shadow-blue-600/20 uppercase tracking-tighter text-2xl border-b-8 border-blue-800 active:translate-y-1 active:border-b-0">
               {loading ? "PROCESSING..." : "REGISTER PERSONNEL"}
               {!loading && <ArrowRight size={28} />}
             </button>
@@ -126,7 +142,10 @@ const Enrollment: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
               <ShieldCheck size={36} />
             </div>
             <h4 className="text-2xl font-black uppercase italic text-white mb-4">Secure Audit</h4>
-            <p className="text-slate-500 text-sm font-bold leading-relaxed">Identity provisioning is logged instantly in the institutional ledger.</p>
+            <p className="text-slate-500 text-sm font-bold leading-relaxed">Identity provisioning is logged instantly. Students will receive an ID prefix unique to {institutionName}.</p>
+          </div>
+          <div className="p-8 text-center opacity-30">
+             <p className="text-[8px] font-black uppercase text-slate-500 tracking-[0.4em]">Powered by SmartClass.lk</p>
           </div>
         </div>
       </div>

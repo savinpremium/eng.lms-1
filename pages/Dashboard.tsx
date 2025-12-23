@@ -15,10 +15,11 @@ import { Users, Calendar, ShieldEllipsis, MessageSquare, Loader2, GraduationCap,
 import { Student, AttendanceRecord, PaymentRecord, Grade, ResultRecord, MaterialRecord, Page } from '../types';
 
 interface DashboardProps {
+  institutionId: string;
   onNavigate: (page: Page) => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
+const Dashboard: React.FC<DashboardProps> = ({ institutionId, onNavigate }) => {
   const [students, setStudents] = useState<Student[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
@@ -29,23 +30,25 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
   useEffect(() => {
     const fetchData = async () => {
-      const s = await storageService.getStudents();
-      const a = await storageService.getAttendance();
-      const p = await storageService.getPayments();
+      // Scoped calls with institutionId
+      const s = await storageService.getStudents(institutionId);
+      const a = await storageService.getAttendance(institutionId);
+      const p = await storageService.getPayments(institutionId);
       setStudents(s);
       setAttendance(a);
       setPayments(p);
     };
     fetchData();
-    const unsubS = storageService.listenStudents(setStudents);
-    const unsubR = storageService.listenResults(setResults);
-    const unsubM = storageService.listenMaterials(setMaterials);
+    // Scoped listeners
+    const unsubS = storageService.listenStudents(institutionId, setStudents);
+    const unsubR = storageService.listenResults(institutionId, setResults);
+    const unsubM = storageService.listenMaterials(institutionId, setMaterials);
     return () => {
       unsubS();
       unsubR();
       unsubM();
     };
-  }, []);
+  }, [institutionId]);
 
   const stats = useMemo(() => {
     const today = new Date().toISOString().split('T')[0];
@@ -73,7 +76,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   }, [students]);
 
   const handleGenerateOTP = async () => {
-    const code = await storageService.generateOTP();
+    // Scoped OTP generation
+    const code = await storageService.generateOTP(institutionId);
     setOtp(code);
     setTimeout(() => setOtp(null), 300000); 
   };

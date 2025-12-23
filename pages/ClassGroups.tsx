@@ -4,7 +4,11 @@ import { storageService } from '../services/storageService';
 import { Grade, ClassGroup } from '../types';
 import { Users, Plus, Trash2, ExternalLink, X, BookOpen, Link as LinkIcon } from 'lucide-react';
 
-const ClassGroups: React.FC = () => {
+interface ClassGroupsProps {
+  institutionId: string;
+}
+
+const ClassGroups: React.FC<ClassGroupsProps> = ({ institutionId }) => {
   const [classes, setClasses] = useState<ClassGroup[]>([]);
   const [showAdd, setShowAdd] = useState(false);
   const [formData, setFormData] = useState<Omit<ClassGroup, 'id'>>({
@@ -15,19 +19,22 @@ const ClassGroups: React.FC = () => {
   });
 
   useEffect(() => {
-    return storageService.listenClasses(setClasses);
-  }, []);
+    // Scoped multi-tenant listener
+    return storageService.listenClasses(institutionId, setClasses);
+  }, [institutionId]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    await storageService.saveClass({ ...formData, id: '' });
+    // Scoped saveClass call
+    await storageService.saveClass(institutionId, { ...formData, id: '' } as ClassGroup);
     setShowAdd(false);
     setFormData({ name: '', grade: 'Grade 1', waLink: '', description: '' });
   };
 
   const handleDelete = async (id: string) => {
     if (confirm("Remove this class batch? This will not delete the students.")) {
-      await storageService.deleteClass(id);
+      // Scoped deleteClass call
+      await storageService.deleteClass(institutionId, id);
     }
   };
 

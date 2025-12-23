@@ -4,7 +4,11 @@ import { storageService } from '../services/storageService';
 import { MaterialRecord, Grade } from '../types';
 import { LibraryBig, Search, Plus, FileText, Video, ExternalLink, Download } from 'lucide-react';
 
-const LearningMaterials: React.FC = () => {
+interface LearningMaterialsProps {
+  institutionId: string;
+}
+
+const LearningMaterials: React.FC<LearningMaterialsProps> = ({ institutionId }) => {
   const [materials, setMaterials] = useState<MaterialRecord[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAdd, setShowAdd] = useState(false);
@@ -17,16 +21,18 @@ const LearningMaterials: React.FC = () => {
   });
 
   useEffect(() => {
-    return storageService.listenMaterials(setMaterials);
-  }, []);
+    // Scoped listener for multi-tenant data
+    return storageService.listenMaterials(institutionId, setMaterials);
+  }, [institutionId]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    await storageService.saveMaterial({
+    // Scoped saveMaterial call
+    await storageService.saveMaterial(institutionId, {
       ...newMat,
       id: '',
       date: new Date().toISOString().split('T')[0]
-    });
+    } as MaterialRecord);
     setShowAdd(false);
     setNewMat({ title: '', description: '', link: '', grade: 'Grade 1', type: 'PDF' });
   };

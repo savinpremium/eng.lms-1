@@ -5,20 +5,25 @@ import { audioService } from '../services/audioService';
 import { Student, AttendanceRecord, Grade } from '../types';
 import { Users, CheckCircle2, Circle, Search, ChevronDown, ChevronUp, MousePointerClick, AlertCircle } from 'lucide-react';
 
-const ClassAttendance: React.FC = () => {
+interface ClassAttendanceProps {
+  institutionId: string;
+}
+
+const ClassAttendance: React.FC<ClassAttendanceProps> = ({ institutionId }) => {
   const [students, setStudents] = useState<Student[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedGrade, setExpandedGrade] = useState<Grade | null>('Grade 1');
 
   useEffect(() => {
-    const unsubscribeStudents = storageService.listenStudents(setStudents);
-    const unsubscribeAttendance = storageService.listenAttendance(setAttendance);
+    // Scoped listener for multi-tenant data
+    const unsubscribeStudents = storageService.listenStudents(institutionId, setStudents);
+    const unsubscribeAttendance = storageService.listenAttendance(institutionId, setAttendance);
     return () => {
       unsubscribeStudents();
       unsubscribeAttendance();
     };
-  }, []);
+  }, [institutionId]);
 
   const currentMonth = new Date().toISOString().slice(0, 7); 
 
@@ -53,8 +58,10 @@ const ClassAttendance: React.FC = () => {
       return;
     }
 
-    await storageService.addAttendance({
+    // Scoped addAttendance call
+    await storageService.addAttendance(institutionId, {
       id: '',
+      institutionId,
       studentId: student.id,
       date: today,
       timestamp: Date.now()

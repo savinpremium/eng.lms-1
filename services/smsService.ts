@@ -45,8 +45,8 @@ export const smsService = {
       if (!data.status) throw new Error(data.message);
       */
 
-      // Log the success
-      await storageService.logMessage({
+      // Log the success scoped to institutionId
+      await storageService.logMessage(student.institutionId, {
         id: '',
         studentId: student.id,
         type: 'SMS',
@@ -59,7 +59,8 @@ export const smsService = {
       return true;
     } catch (error) {
       console.error('SMS Gateway Error:', error);
-      await storageService.logMessage({
+      // Log the failure scoped to institutionId
+      await storageService.logMessage(student.institutionId, {
         id: '',
         studentId: student.id,
         type: 'SMS',

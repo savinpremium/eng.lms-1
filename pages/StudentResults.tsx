@@ -4,7 +4,11 @@ import { storageService } from '../services/storageService';
 import { Student, ResultRecord, Grade } from '../types';
 import { GraduationCap, Search, Plus, Trophy, TrendingUp, Filter } from 'lucide-react';
 
-const StudentResults: React.FC = () => {
+interface StudentResultsProps {
+  institutionId: string;
+}
+
+const StudentResults: React.FC<StudentResultsProps> = ({ institutionId }) => {
   const [students, setStudents] = useState<Student[]>([]);
   const [results, setResults] = useState<ResultRecord[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -17,13 +21,15 @@ const StudentResults: React.FC = () => {
   });
 
   useEffect(() => {
-    storageService.listenStudents(setStudents);
-    storageService.listenResults(setResults);
-  }, []);
+    // Scoped multi-tenant listeners
+    storageService.listenStudents(institutionId, setStudents);
+    storageService.listenResults(institutionId, setResults);
+  }, [institutionId]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    await storageService.saveResult({
+    // Scoped saveResult call
+    await storageService.saveResult(institutionId, {
       ...newRes,
       id: '',
       date: new Date().toISOString().split('T')[0]

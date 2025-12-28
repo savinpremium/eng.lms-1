@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { storageService } from '../services/storageService';
 import { audioService } from '../services/audioService';
 import { Student, Page } from '../types';
-import { UserPlus, Search, Trash2, Printer, X, Loader2, ShieldCheck } from 'lucide-react';
+import { Search, Trash2, Printer, X, Loader2 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 
 interface StudentRegistryProps {
@@ -29,7 +29,7 @@ const StudentRegistry: React.FC<StudentRegistryProps> = ({ institutionId, instit
   );
 
   const handleDelete = async (id: string, name: string) => {
-    if (confirm(`Remove student "${name}"?`)) {
+    if (confirm(`Terminate record for "${name}"?`)) {
       await storageService.deleteStudent(institutionId, id);
       audioService.playError();
     }
@@ -48,7 +48,6 @@ const StudentRegistry: React.FC<StudentRegistryProps> = ({ institutionId, instit
 
     buffer.innerHTML = `
       <div id="pvc-card-target" style="width: 648px; height: 408px; background: white; border-radius: 40px; position: relative; overflow: hidden; font-family: 'Inter', sans-serif; display: flex; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
-        <!-- LEFT SIDE (WHITE) -->
         <div style="flex: 0 0 38%; background: white; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px; position: relative;">
           <div style="width: 220px; height: 220px; background: white; display: flex; align-items: center; justify-content: center;">
             <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${student.id}" style="width: 100%; height: 100%;" />
@@ -58,9 +57,7 @@ const StudentRegistry: React.FC<StudentRegistryProps> = ({ institutionId, instit
           </div>
         </div>
 
-        <!-- RIGHT SIDE (NAVY) -->
         <div style="flex: 1; background: #020617; padding: 45px; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden;">
-          <!-- BG DECORATION -->
           <div style="position: absolute; top: -50px; right: -50px; width: 350px; height: 350px; background: #1e3a8a; border-radius: 50%; opacity: 0.2; filter: blur(60px);"></div>
           
           <div style="position: relative; z-index: 10;">
@@ -95,8 +92,6 @@ const StudentRegistry: React.FC<StudentRegistryProps> = ({ institutionId, instit
               </div>
             </div>
           </div>
-
-          <!-- BOTTOM ACCENT -->
           <div style="position: absolute; bottom: 0; left: 0; right: 0; height: 14px; background: #2563eb;"></div>
         </div>
       </div>
@@ -106,10 +101,7 @@ const StudentRegistry: React.FC<StudentRegistryProps> = ({ institutionId, instit
       await new Promise(r => setTimeout(r, 800));
       const node = document.getElementById('pvc-card-target');
       if (node) {
-        const dataUrl = await toPng(node, { 
-          pixelRatio: 2,
-          backgroundColor: 'transparent'
-        });
+        const dataUrl = await toPng(node, { pixelRatio: 2, backgroundColor: 'transparent' });
         setPvcImage(dataUrl);
       }
     } finally {
@@ -122,8 +114,8 @@ const StudentRegistry: React.FC<StudentRegistryProps> = ({ institutionId, instit
     <div className="space-y-6 md:space-y-12 pb-20 p-4">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 animate-in fade-in slide-in-from-top-4 duration-500">
         <div>
-          <h1 className="text-3xl md:text-5xl font-black tracking-tighter uppercase italic leading-none text-white">Student List</h1>
-          <p className="text-slate-500 font-bold uppercase text-[9px] tracking-[0.4em] mt-2">Institutional Personnel Database | {institutionName}</p>
+          <h1 className="text-3xl md:text-5xl font-black tracking-tighter uppercase italic leading-none text-white">Students</h1>
+          <p className="text-slate-500 font-bold uppercase text-[9px] tracking-[0.4em] mt-2">Active Academic Registry | {institutionName}</p>
         </div>
         <div className="flex gap-3 w-full md:w-auto">
           <div className="relative flex-1 md:w-64">
@@ -135,8 +127,8 @@ const StudentRegistry: React.FC<StudentRegistryProps> = ({ institutionId, instit
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <button onClick={() => onNavigate(Page.ENROLLMENT)} className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-3 rounded-2xl font-black text-[10px] tracking-widest uppercase flex items-center gap-2 shadow-xl border-b-4 border-blue-800 active:translate-y-1 active:border-b-0 transition-all">
-            Add Student
+          <button onClick={() => onNavigate(Page.REGISTRATION)} className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-3 rounded-2xl font-black text-[10px] tracking-widest uppercase flex items-center gap-2 shadow-xl border-b-4 border-blue-800 active:translate-y-1 active:border-b-0 transition-all">
+            Register Student
           </button>
         </div>
       </header>
@@ -146,7 +138,7 @@ const StudentRegistry: React.FC<StudentRegistryProps> = ({ institutionId, instit
           <table className="w-full text-left">
             <thead className="bg-slate-950 border-b border-slate-800">
               <tr>
-                <th className="p-6 md:p-8 text-[9px] font-black tracking-[0.4em] uppercase text-slate-500">Personnel</th>
+                <th className="p-6 md:p-8 text-[9px] font-black tracking-[0.4em] uppercase text-slate-500">Student</th>
                 <th className="p-6 md:p-8 text-[9px] font-black tracking-[0.4em] uppercase text-slate-500 hidden md:table-cell">Level</th>
                 <th className="p-6 md:p-8 text-[9px] font-black tracking-[0.4em] uppercase text-slate-500 hidden md:table-cell">Finance</th>
                 <th className="p-6 md:p-8 text-[9px] font-black tracking-[0.4em] uppercase text-slate-500 text-right">Actions</th>
@@ -168,9 +160,9 @@ const StudentRegistry: React.FC<StudentRegistryProps> = ({ institutionId, instit
                   <td className="p-8 hidden md:table-cell">
                     <div className="flex items-center gap-2 text-emerald-500 font-black text-[9px] uppercase tracking-widest">
                       <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                      Verified
+                      Paid
                     </div>
-                    <p className="text-xs font-bold text-slate-400 mt-1">{student.lastPaymentMonth}</p>
+                    <p className="text-xs font-bold text-slate-400 mt-1 uppercase">{student.lastPaymentMonth}</p>
                   </td>
                   <td className="p-6 md:p-8 text-right">
                     <div className="flex gap-2 md:gap-3 justify-end">
@@ -192,8 +184,6 @@ const StudentRegistry: React.FC<StudentRegistryProps> = ({ institutionId, instit
           </table>
         </div>
       </div>
-      
-      <p className="text-center text-[8px] font-black uppercase text-slate-700 tracking-[0.5em] mt-8">Systems powered by SmartClass.lk</p>
 
       {pvcImage && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-2xl animate-in fade-in duration-300">
@@ -205,10 +195,9 @@ const StudentRegistry: React.FC<StudentRegistryProps> = ({ institutionId, instit
                </div>
              </div>
              <div className="grid grid-cols-2 gap-4">
-               <button onClick={() => window.print()} className="bg-blue-600 text-white py-4 md:py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl border-b-4 border-blue-800 transition-all hover:bg-blue-500 active:translate-y-1">Print ID Card</button>
-               <a href={pvcImage} download={`ID_${selectedForPrint?.id}.png`} className="bg-slate-800 text-white py-4 md:py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center border border-slate-700 hover:bg-slate-700 transition-all">Download Image</a>
+               <button onClick={() => window.print()} className="bg-blue-600 text-white py-4 md:py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl border-b-4 border-blue-800 transition-all hover:bg-blue-500 active:translate-y-1">Print Pass</button>
+               <a href={pvcImage} download={`ID_${selectedForPrint?.id}.png`} className="bg-slate-800 text-white py-4 md:py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center border border-slate-700 hover:bg-slate-700 transition-all">Download</a>
              </div>
-             <p className="text-center mt-6 text-[8px] font-black uppercase text-slate-600 tracking-widest italic">Powered by SmartClass.lk</p>
           </div>
         </div>
       )}

@@ -33,15 +33,15 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate, onLogout, tie
   const instituteItems = [
     { page: Page.DASHBOARD, icon: LayoutDashboard, label: 'Dashboard' },
     { page: Page.PAYMENTS, icon: CreditCard, label: 'Payments' },
-    { page: Page.ENROLLMENT, icon: UserPlus, label: 'Register' },
-    { page: Page.STUDENTS, icon: Users, label: 'Student List' },
+    { page: Page.REGISTRATION, icon: UserPlus, label: 'Register' },
+    { page: Page.STUDENTS, icon: Users, label: 'Students' },
     { page: Page.ATTENDANCE, icon: ScanQrCode, label: 'Attendance' },
-    { page: Page.CLASS_ATTENDANCE, icon: BookOpenCheck, label: 'Monthly Register' },
-    { page: Page.GROUPS, icon: Layers, label: 'Class Groups' },
-    { page: Page.SCHEDULE, icon: Calendar, label: 'Schedule Matrix' },
-    { page: Page.MESSENGER, icon: MessageSquare, label: 'Ai Message Gen' },
-    { page: Page.EXAMS, icon: GraduationCap, label: 'Assessments' },
-    { page: Page.MATERIALS, icon: LibraryBig, label: 'Study Hub' },
+    { page: Page.CLASS_ATTENDANCE, icon: BookOpenCheck, label: 'Monthly Logs' },
+    { page: Page.GROUPS, icon: Layers, label: 'Batches' },
+    { page: Page.SCHEDULE, icon: Calendar, label: 'Schedule' },
+    { page: Page.MESSENGER, icon: MessageSquare, label: 'AI Message' },
+    { page: Page.EXAMS, icon: GraduationCap, label: 'Assessment' },
+    { page: Page.MATERIALS, icon: LibraryBig, label: 'Assets' },
     { page: Page.COMM_HUB, icon: History, label: 'Audit Log' },
   ];
 
@@ -61,7 +61,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate, onLogout, tie
         <div>
           <h1 className="font-black text-xl tracking-tighter uppercase leading-none text-white">SmartClass<span className="text-blue-500">.lk</span></h1>
           <p className="text-[9px] tracking-[0.2em] font-bold text-slate-500 uppercase mt-1">
-            {role === 'SUPER_ADMIN' ? 'Network Owner' : institutionName || 'Institutional Console'}
+            {role === 'SUPER_ADMIN' ? 'Network' : (institutionName || 'Academy Console')}
           </p>
         </div>
       </div>
@@ -84,12 +84,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate, onLogout, tie
       </nav>
 
       <div className="p-4 border-t border-slate-800">
-        <div className="mb-4 px-6">
-           <p className="text-[8px] font-black uppercase text-slate-600 tracking-widest">Powering Education</p>
-        </div>
         <button
           onClick={onLogout}
-          className="w-full flex items-center gap-4 px-6 py-4 text-rose-500 hover:bg-rose-500/10 rounded-3xl transition-all font-bold"
+          className="w-full flex items-center gap-4 px-6 py-4 text-rose-500 hover:bg-rose-500/10 rounded-2xl transition-all font-bold"
         >
           <LogOut size={20} />
           Sign Out

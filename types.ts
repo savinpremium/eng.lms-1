@@ -9,7 +9,7 @@ export type PaymentMode = 'Subscription' | 'OneTime';
 export type InstitutionStatus = 'Active' | 'Suspended' | 'Frozen';
 
 export interface Institution {
-  id: string;
+  id: string; // The "Class ID"
   name: string;
   email: string;
   password: string;
@@ -25,6 +25,7 @@ export interface Institution {
   subjects: string[];
   location: string;
   createdAt: number;
+  emailVerified: boolean;
 }
 
 export interface Student {
@@ -118,7 +119,7 @@ export enum Page {
   ATTENDANCE = 'ATTENDANCE',
   PAYMENTS = 'PAYMENTS',
   MESSENGER = 'MESSENGER',
-  ENROLLMENT = 'ENROLLMENT',
+  REGISTRATION = 'REGISTRATION',
   EXAMS = 'EXAMS',
   MATERIALS = 'MATERIALS',
   COMM_HUB = 'COMM_HUB',

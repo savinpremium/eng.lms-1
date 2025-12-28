@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Page, AuthState, Tier, Institution } from './types';
+import { Page, AuthState, Institution } from './types';
 import LandingPage from './pages/LandingPage';
 import SuperAdminDesk from './pages/SuperAdminDesk';
 import Dashboard from './pages/Dashboard';
@@ -18,7 +18,7 @@ import CommLogs from './pages/CommLogs';
 import ScheduleDesk from './pages/ScheduleDesk';
 import Sidebar from './components/Sidebar';
 import { storageService } from './services/storageService';
-import { Wifi, WifiOff, ShieldCheck } from 'lucide-react';
+import { Wifi, WifiOff } from 'lucide-react';
 
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<Page>(Page.LANDING);
@@ -82,7 +82,7 @@ const App: React.FC = () => {
         return <PaymentDesk institutionId={instId} institutionName={instName} />;
       case Page.MESSENGER:
         return auth.tier !== 'Lite' ? <AIMessenger institutionId={instId} /> : <div className="p-20 text-center font-black uppercase text-slate-800">Platinum Feature Only</div>;
-      case Page.ENROLLMENT:
+      case Page.REGISTRATION:
         return <Enrollment institutionId={instId} institutionName={instName} onComplete={() => setCurrentPage(Page.STUDENTS)} />;
       case Page.PORTAL:
         return <StudentPortal institutionId={instId} onBack={logout} />;
@@ -108,7 +108,7 @@ const App: React.FC = () => {
       <div className="fixed top-4 right-4 z-[60] flex items-center gap-2 bg-slate-900/80 backdrop-blur-xl border border-slate-800 px-4 py-2 rounded-full shadow-2xl">
         {isConnected ? <Wifi size={14} className="text-emerald-500" /> : <WifiOff size={14} className="text-rose-500" />}
         <span className={`text-[9px] font-black uppercase tracking-widest ${isConnected ? 'text-emerald-500' : 'text-rose-500'}`}>
-          {isConnected ? 'Online' : 'Offline'}
+          {isConnected ? 'Sync Active' : 'Offline'}
         </span>
       </div>
 

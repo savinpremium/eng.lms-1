@@ -1,8 +1,8 @@
 
 import { initializeApp } from "firebase/app";
-import { getDatabase, ref, set, get, push, update, onValue, child, remove } from "firebase/database";
-import { getAuth } from "firebase/auth";
-import { Student, AttendanceRecord, PaymentRecord, Institution, Tier, ResultRecord, MaterialRecord, MessageLog, ClassGroup, ScheduleRecord } from '../types';
+import { getDatabase, ref, set, get, push, update, onValue, remove, query, orderByChild, equalTo } from "firebase/database";
+import { getAuth, createUserWithEmailAndPassword, sendEmailVerification, signInWithEmailAndPassword, onAuthStateChanged } from "firebase/auth";
+import { Student, AttendanceRecord, PaymentRecord, Institution, ResultRecord, MaterialRecord, MessageLog, ClassGroup, ScheduleRecord } from '../types';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDneDiUzFALG_DcH1gNJmzB0WIddQcDxsA",
@@ -19,12 +19,23 @@ const db = getDatabase(app);
 export const auth = getAuth(app);
 
 export const storageService = {
-  // --- MULTI-TENANT INSTITUTION MANAGEMENT (Super Admin Only) ---
+  onConnectionChange: (callback: (online: boolean) => void) => {
+    const connectedRef = ref(db, ".info/connected");
+    onValue(connectedRef, (snap) => callback(!!snap.val()));
+    return () => {};
+  },
+
+  // --- MULTI-TENANT CLASS MANAGEMENT (Super Admin Only) ---
   saveInstitution: async (inst: Institution) => {
-    const instRef = inst.id ? ref(db, `institutions/${inst.id}`) : push(ref(db, 'institutions'));
-    const id = inst.id || instRef.key as string;
+    // Super admin can provide custom ID or we use the generated one
+    const id = inst.id.toUpperCase().trim();
     await set(ref(db, `institutions/${id}`), { ...inst, id, status: inst.status || 'Active' });
     return id;
+  },
+
+  checkIdExists: async (id: string): Promise<boolean> => {
+    const snap = await get(ref(db, `institutions/${id.toUpperCase().trim()}`));
+    return snap.exists();
   },
 
   updateInstitution: async (id: string, updates: Partial<Institution>) => {
@@ -33,187 +44,184 @@ export const storageService = {
 
   deleteInstitution: async (id: string) => {
     await remove(ref(db, `institutions/${id}`));
-    // In a production app, we would also clean up data/instId here
   },
 
   getInstitution: async (id: string): Promise<Institution | null> => {
-    const snap = await get(ref(db, `institutions/${id}`));
-    return snap.exists() ? snap.val() : null;
+    const snap = await get(ref(db, `institutions/${id.toUpperCase().trim()}`));
+    return snap.val() as Institution;
   },
 
   listenInstitutions: (callback: (insts: Institution[]) => void) => {
-    return onValue(ref(db, 'institutions'), (snap) => {
-      callback(snap.exists() ? Object.values(snap.val()) : []);
+    const instsRef = ref(db, 'institutions');
+    return onValue(instsRef, (snap) => {
+      const data = snap.val();
+      if (data) {
+        callback(Object.values(data));
+      } else {
+        callback([]);
+      }
     });
   },
 
-  // --- AUTHENTICATION ---
-  validateInstituteLogin: async (email: string, pass: string): Promise<Institution | null> => {
-    const snap = await get(ref(db, 'institutions'));
-    if (!snap.exists()) return null;
-    const insts = Object.values(snap.val()) as Institution[];
-    const inst = insts.find(i => i.email === email && i.password === pass);
-    
-    if (inst && inst.status === 'Suspended') {
-      throw new Error("This account has been suspended by the network administrator.");
-    }
-    
-    return inst || null;
+  // Firebase Auth Verification for Institutions
+  registerInstitutionAuth: async (email: string, pass: string) => {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
+    await sendEmailVerification(userCredential.user);
+    return userCredential.user;
   },
 
-  // --- SCOPED DATA (Requires institutionId) ---
+  validateInstituteLogin: async (email: string, pass: string): Promise<Institution | null> => {
+    try {
+      await signInWithEmailAndPassword(auth, email, pass);
+      const instsSnap = await get(ref(db, 'institutions'));
+      const insts = instsSnap.val() || {};
+      const found = Object.values(insts).find((i: any) => i.email === email) as Institution;
+      return found || null;
+    } catch (e) {
+      // Fallback for demo/manual entries or if auth fails
+      const instsSnap = await get(ref(db, 'institutions'));
+      const insts = instsSnap.val() || {};
+      return Object.values(insts).find((i: any) => i.email === email && i.password === pass) as Institution || null;
+    }
+  },
+
+  // --- STUDENT MANAGEMENT (Tenant Scoped) ---
+  saveStudent: async (instId: string, student: Student) => {
+    const id = student.id || push(ref(db, `students/${instId}`)).key as string;
+    await set(ref(db, `students/${instId}/${id}`), { ...student, id });
+  },
+
   getStudents: async (instId: string): Promise<Student[]> => {
-    const snap = await get(ref(db, `data/${instId}/students`));
+    const snap = await get(ref(db, `students/${instId}`));
     return snap.exists() ? Object.values(snap.val()) : [];
   },
 
   listenStudents: (instId: string, callback: (students: Student[]) => void) => {
-    return onValue(ref(db, `data/${instId}/students`), (snap) => {
+    return onValue(ref(db, `students/${instId}`), (snap) => {
       callback(snap.exists() ? Object.values(snap.val()) : []);
     });
-  },
-
-  saveStudent: async (instId: string, student: Student) => {
-    await set(ref(db, `data/${instId}/students/${student.id}`), { ...student, institutionId: instId });
   },
 
   updateStudent: async (instId: string, student: Student) => {
-    await set(ref(db, `data/${instId}/students/${student.id}`), student);
+    await update(ref(db, `students/${instId}/${student.id}`), student);
   },
 
-  deleteStudent: async (instId: string, id: string) => {
-    await remove(ref(db, `data/${instId}/students/${id}`));
+  deleteStudent: async (instId: string, studentId: string) => {
+    await remove(ref(db, `students/${instId}/${studentId}`));
+  },
+
+  // --- ATTENDANCE (Tenant Scoped) ---
+  addAttendance: async (instId: string, record: AttendanceRecord) => {
+    const newRef = push(ref(db, `attendance/${instId}`));
+    const id = newRef.key as string;
+    await set(newRef, { ...record, id });
+    return id;
   },
 
   getAttendance: async (instId: string): Promise<AttendanceRecord[]> => {
-    const snap = await get(ref(db, `data/${instId}/attendance`));
+    const snap = await get(ref(db, `attendance/${instId}`));
     return snap.exists() ? Object.values(snap.val()) : [];
   },
 
-  listenAttendance: (instId: string, callback: (recs: AttendanceRecord[]) => void) => {
-    return onValue(ref(db, `data/${instId}/attendance`), (snap) => {
+  listenAttendance: (instId: string, callback: (records: AttendanceRecord[]) => void) => {
+    return onValue(ref(db, `attendance/${instId}`), (snap) => {
       callback(snap.exists() ? Object.values(snap.val()) : []);
     });
   },
 
-  addAttendance: async (instId: string, record: AttendanceRecord) => {
-    const newRef = push(ref(db, `data/${instId}/attendance`));
-    await set(newRef, { ...record, id: newRef.key, institutionId: instId });
-    return newRef.key as string;
+  deleteAttendance: async (instId: string, recordId: string) => {
+    await remove(ref(db, `attendance/${instId}/${recordId}`));
   },
 
-  deleteAttendance: async (instId: string, id: string) => {
-    await remove(ref(db, `data/${instId}/attendance/${id}`));
+  // --- PAYMENTS (Tenant Scoped) ---
+  addPayment: async (instId: string, payment: PaymentRecord) => {
+    const newRef = push(ref(db, `payments/${instId}`));
+    const id = newRef.key as string;
+    await set(newRef, { ...payment, id });
+    return id;
   },
 
   getPayments: async (instId: string): Promise<PaymentRecord[]> => {
-    const snap = await get(ref(db, `data/${instId}/payments`));
+    const snap = await get(ref(db, `payments/${instId}`));
     return snap.exists() ? Object.values(snap.val()) : [];
   },
 
-  listenPayments: (instId: string, callback: (recs: PaymentRecord[]) => void) => {
-    return onValue(ref(db, `data/${instId}/payments`), (snap) => {
-      callback(snap.exists() ? Object.values(snap.val()) : []);
-    });
-  },
-
-  addPayment: async (instId: string, record: PaymentRecord) => {
-    const newRef = push(ref(db, `data/${instId}/payments`));
-    await set(newRef, { ...record, id: newRef.key, institutionId: instId });
-    return newRef.key as string;
-  },
-
-  updateStudentLastPayment: async (instId: string, studentId: string, month: string) => {
-    await update(ref(db, `data/${instId}/students/${studentId}`), { lastPaymentMonth: month });
-  },
-
-  // Added Results handling
-  listenResults: (instId: string, callback: (results: ResultRecord[]) => void) => {
-    return onValue(ref(db, `data/${instId}/results`), (snap) => {
-      callback(snap.exists() ? Object.values(snap.val()) : []);
-    });
-  },
-
-  saveResult: async (instId: string, result: ResultRecord) => {
-    const newRef = result.id ? ref(db, `data/${instId}/results/${result.id}`) : push(ref(db, `data/${instId}/results`));
-    const id = result.id || newRef.key as string;
-    await set(ref(db, `data/${instId}/results/${id}`), { ...result, id });
-  },
-
-  // Added Materials handling
-  listenMaterials: (instId: string, callback: (materials: MaterialRecord[]) => void) => {
-    return onValue(ref(db, `data/${instId}/materials`), (snap) => {
-      callback(snap.exists() ? Object.values(snap.val()) : []);
-    });
-  },
-
-  saveMaterial: async (instId: string, material: MaterialRecord) => {
-    const newRef = material.id ? ref(db, `data/${instId}/materials/${material.id}`) : push(ref(db, `data/${instId}/materials`));
-    const id = material.id || newRef.key as string;
-    await set(ref(db, `data/${instId}/materials/${id}`), { ...material, id });
-  },
-
-  // Added OTP handling
+  // --- OTP MANAGEMENT ---
   generateOTP: async (instId: string): Promise<string> => {
     const code = Math.floor(1000 + Math.random() * 9000).toString();
-    await set(ref(db, `data/${instId}/otp`), { code, expires: Date.now() + 300000 });
+    await set(ref(db, `otps/${instId}`), { code, expiresAt: Date.now() + 300000 });
     return code;
   },
 
   validateOTP: async (instId: string, code: string): Promise<boolean> => {
-    const snap = await get(ref(db, `data/${instId}/otp`));
+    const snap = await get(ref(db, `otps/${instId}`));
     if (!snap.exists()) return false;
     const data = snap.val();
-    return data.code === code && data.expires > Date.now();
+    if (data.expiresAt < Date.now()) return false;
+    return data.code === code;
   },
 
-  // Added Classes handling
-  listenClasses: (instId: string, callback: (classes: ClassGroup[]) => void) => {
-    return onValue(ref(db, `data/${instId}/classes`), (snap) => {
+  // --- ASSESSMENT & HUB ---
+  saveResult: async (instId: string, res: ResultRecord) => {
+    const id = push(ref(db, `results/${instId}`)).key as string;
+    await set(ref(db, `results/${instId}/${id}`), { ...res, id });
+  },
+
+  listenResults: (instId: string, callback: (results: ResultRecord[]) => void) => {
+    return onValue(ref(db, `results/${instId}`), (snap) => {
       callback(snap.exists() ? Object.values(snap.val()) : []);
     });
   },
 
-  saveClass: async (instId: string, classObj: ClassGroup) => {
-    const newRef = classObj.id ? ref(db, `data/${instId}/classes/${classObj.id}`) : push(ref(db, `data/${instId}/classes`));
-    const id = classObj.id || newRef.key as string;
-    await set(ref(db, `data/${instId}/classes/${id}`), { ...classObj, id });
+  saveMaterial: async (instId: string, mat: MaterialRecord) => {
+    const id = push(ref(db, `materials/${instId}`)).key as string;
+    await set(ref(db, `materials/${instId}/${id}`), { ...mat, id });
   },
 
-  deleteClass: async (instId: string, id: string) => {
-    await remove(ref(db, `data/${instId}/classes/${id}`));
-  },
-
-  // Added Logs handling
-  listenLogs: (instId: string, callback: (logs: MessageLog[]) => void) => {
-    return onValue(ref(db, `data/${instId}/logs`), (snap) => {
+  listenMaterials: (instId: string, callback: (mats: MaterialRecord[]) => void) => {
+    return onValue(ref(db, `materials/${instId}`), (snap) => {
       callback(snap.exists() ? Object.values(snap.val()) : []);
     });
   },
 
   logMessage: async (instId: string, log: MessageLog) => {
-    const newRef = push(ref(db, `data/${instId}/logs`));
-    await set(newRef, { ...log, id: newRef.key });
+    const id = push(ref(db, `logs/${instId}`)).key as string;
+    await set(ref(db, `logs/${instId}/${id}`), { ...log, id });
   },
 
-  // Added Schedules handling
-  listenSchedules: (instId: string, callback: (schedules: ScheduleRecord[]) => void) => {
-    return onValue(ref(db, `data/${instId}/schedules`), (snap) => {
+  listenLogs: (instId: string, callback: (logs: MessageLog[]) => void) => {
+    return onValue(ref(db, `logs/${instId}`), (snap) => {
       callback(snap.exists() ? Object.values(snap.val()) : []);
     });
   },
 
-  saveSchedule: async (instId: string, schedule: ScheduleRecord) => {
-    const newRef = schedule.id ? ref(db, `data/${instId}/schedules/${schedule.id}`) : push(ref(db, `data/${instId}/schedules`));
-    const id = schedule.id || newRef.key as string;
-    await set(ref(db, `data/${instId}/schedules/${id}`), { ...schedule, id });
+  saveClass: async (instId: string, cls: ClassGroup) => {
+    const id = push(ref(db, `classes/${instId}`)).key as string;
+    await set(ref(db, `classes/${instId}/${id}`), { ...cls, id });
   },
 
-  deleteSchedule: async (instId: string, id: string) => {
-    await remove(ref(db, `data/${instId}/schedules/${id}`));
+  listenClasses: (instId: string, callback: (classes: ClassGroup[]) => void) => {
+    return onValue(ref(db, `classes/${instId}`), (snap) => {
+      callback(snap.exists() ? Object.values(snap.val()) : []);
+    });
   },
 
-  onConnectionChange: (callback: (connected: boolean) => void) => {
-    return onValue(ref(db, ".info/connected"), (snap) => callback(snap.val() === true));
+  deleteClass: async (instId: string, classId: string) => {
+    await remove(ref(db, `classes/${instId}/${classId}`));
+  },
+
+  saveSchedule: async (instId: string, sch: ScheduleRecord) => {
+    const id = push(ref(db, `schedules/${instId}`)).key as string;
+    await set(ref(db, `schedules/${instId}/${id}`), { ...sch, id });
+  },
+
+  listenSchedules: (instId: string, callback: (sch: ScheduleRecord[]) => void) => {
+    return onValue(ref(db, `schedules/${instId}`), (snap) => {
+      callback(snap.exists() ? Object.values(snap.val()) : []);
+    });
+  },
+
+  deleteSchedule: async (instId: string, schId: string) => {
+    await remove(ref(db, `schedules/${instId}/${schId}`));
   }
 };

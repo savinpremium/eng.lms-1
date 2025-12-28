@@ -10,6 +10,12 @@ import PaymentDesk from './pages/PaymentDesk';
 import AIMessenger from './pages/AIMessenger';
 import Enrollment from './pages/Enrollment';
 import StudentPortal from './pages/StudentPortal';
+import ClassAttendance from './pages/ClassAttendance';
+import ClassGroups from './pages/ClassGroups';
+import StudentResults from './pages/StudentResults';
+import LearningMaterials from './pages/LearningMaterials';
+import CommLogs from './pages/CommLogs';
+import ScheduleDesk from './pages/ScheduleDesk';
 import Sidebar from './components/Sidebar';
 import { storageService } from './services/storageService';
 import { Wifi, WifiOff, ShieldCheck } from 'lucide-react';
@@ -58,25 +64,40 @@ const App: React.FC = () => {
   const showSidebar = auth.role !== 'NONE' && auth.role !== 'STUDENT' && currentPage !== Page.LANDING;
 
   const renderPage = () => {
+    const instId = auth.institutionId!;
+    const instName = auth.institutionName;
+
     switch (currentPage) {
       case Page.LANDING:
         return <LandingPage onLogin={handleLogin} />;
       case Page.SUPER_ADMIN:
         return <SuperAdminDesk />;
       case Page.DASHBOARD:
-        return <Dashboard institutionId={auth.institutionId!} onNavigate={setCurrentPage} />;
+        return <Dashboard institutionId={instId} onNavigate={setCurrentPage} />;
       case Page.STUDENTS:
-        return <StudentRegistry institutionId={auth.institutionId!} institutionName={auth.institutionName} onNavigate={setCurrentPage} />;
+        return <StudentRegistry institutionId={instId} institutionName={instName} onNavigate={setCurrentPage} />;
       case Page.ATTENDANCE:
-        return <AttendanceGate institutionId={auth.institutionId!} />;
+        return <AttendanceGate institutionId={instId} />;
       case Page.PAYMENTS:
-        return <PaymentDesk institutionId={auth.institutionId!} institutionName={auth.institutionName} />;
+        return <PaymentDesk institutionId={instId} institutionName={instName} />;
       case Page.MESSENGER:
-        return auth.tier !== 'Lite' ? <AIMessenger institutionId={auth.institutionId!} institutionName={auth.institutionName} /> : <div className="p-20 text-center font-black uppercase text-slate-800">Platinum Feature Only</div>;
+        return auth.tier !== 'Lite' ? <AIMessenger institutionId={instId} /> : <div className="p-20 text-center font-black uppercase text-slate-800">Platinum Feature Only</div>;
       case Page.ENROLLMENT:
-        return <Enrollment institutionId={auth.institutionId!} institutionName={auth.institutionName} onComplete={() => setCurrentPage(Page.STUDENTS)} />;
+        return <Enrollment institutionId={instId} institutionName={instName} onComplete={() => setCurrentPage(Page.STUDENTS)} />;
       case Page.PORTAL:
-        return <StudentPortal institutionId={auth.institutionId!} onBack={logout} />;
+        return <StudentPortal institutionId={instId} onBack={logout} />;
+      case Page.CLASS_ATTENDANCE:
+        return <ClassAttendance institutionId={instId} />;
+      case Page.GROUPS:
+        return <ClassGroups institutionId={instId} />;
+      case Page.EXAMS:
+        return <StudentResults institutionId={instId} />;
+      case Page.MATERIALS:
+        return <LearningMaterials institutionId={instId} />;
+      case Page.COMM_HUB:
+        return <CommLogs institutionId={instId} />;
+      case Page.SCHEDULE:
+        return <ScheduleDesk institutionId={instId} />;
       default:
         return <LandingPage onLogin={handleLogin} />;
     }

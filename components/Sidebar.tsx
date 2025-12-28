@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Page, AuthState } from '../types';
+import { Page } from '../types';
 import { 
   LayoutDashboard, 
   Users, 
@@ -15,7 +15,8 @@ import {
   LibraryBig,
   History,
   Layers,
-  Globe
+  Globe,
+  Calendar
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -37,6 +38,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate, onLogout, tie
     { page: Page.ATTENDANCE, icon: ScanQrCode, label: 'Attendance' },
     { page: Page.CLASS_ATTENDANCE, icon: BookOpenCheck, label: 'Monthly Register' },
     { page: Page.GROUPS, icon: Layers, label: 'Class Groups' },
+    { page: Page.SCHEDULE, icon: Calendar, label: 'Schedule Matrix' },
     { page: Page.MESSENGER, icon: MessageSquare, label: 'Ai Message Gen' },
     { page: Page.EXAMS, icon: GraduationCap, label: 'Assessments' },
     { page: Page.MATERIALS, icon: LibraryBig, label: 'Study Hub' },

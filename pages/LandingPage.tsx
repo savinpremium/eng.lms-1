@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Page, Grade, Institution } from '../types';
 import { storageService } from '../services/storageService';
 import { audioService } from '../services/audioService';
-import { ShieldCheck, Search, ArrowRight, Loader2, Lock, Building, GraduationCap, Sparkles } from 'lucide-react';
+import { ShieldCheck, ArrowRight, Loader2, Lock, Building, GraduationCap, Sparkles } from 'lucide-react';
 
 interface LandingPageProps {
   onLogin: (type: 'SUPER' | 'INST' | 'STUDENT', data?: any) => void;
@@ -16,40 +16,52 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
   
   const [showStaffLogin, setShowStaffLogin] = useState(false);
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
+  const [loginError, setLoginError] = useState<string | null>(null);
 
   const handleSearchInst = async () => {
     if (!instId) return;
     setSearchingInst(true);
-    const inst = await storageService.getInstitution(instId);
-    if (inst) {
-      setFoundInst(inst);
-      audioService.playSuccess();
-    } else {
-      audioService.playError();
-      alert("Invalid Institution ID");
+    try {
+      const inst = await storageService.getInstitution(instId);
+      if (inst) {
+        setFoundInst(inst);
+        audioService.playSuccess();
+      } else {
+        audioService.playError();
+        alert("Institutional record not found. Please check your Campus ID.");
+      }
+    } catch (e) {
+      alert("Network search error. Try again.");
+    } finally {
+      setSearchingInst(false);
     }
-    setSearchingInst(false);
   };
 
   const handleStaffLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoginError(null);
     
-    // Super Admin Credentials Check (Savin & Iresha)
+    // Super Admin Credentials
     const isSuperAdmin = 
-      (loginForm.email === 'Iresha1978' && loginForm.password === 'Iresha1978') ||
-      (loginForm.email === 'savin@owner.com' && loginForm.password === 'Savin@2011.lk');
+      (loginForm.email === 'savinpremium.lk@gmail.com' && loginForm.password === 'Savin123') ||
+      (loginForm.email === 'Iresha1978' && loginForm.password === 'Iresha1978');
 
     if (isSuperAdmin) {
       onLogin('SUPER');
       return;
     }
 
-    const inst = await storageService.validateInstituteLogin(loginForm.email, loginForm.password);
-    if (inst) {
-      onLogin('INST', inst);
-    } else {
+    try {
+      const inst = await storageService.validateInstituteLogin(loginForm.email, loginForm.password);
+      if (inst) {
+        onLogin('INST', inst);
+      } else {
+        audioService.playError();
+        setLoginError("Invalid staff credentials. Note: Database entries are case-sensitive.");
+      }
+    } catch (err: any) {
       audioService.playError();
-      alert("Invalid Credentials");
+      setLoginError(err.message || "Authentication service unavailable.");
     }
   };
 
@@ -84,6 +96,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
               className="w-full bg-slate-900 border-2 border-slate-800 rounded-[2.5rem] px-10 py-8 text-3xl font-black tracking-tight focus:border-blue-600 focus:outline-none text-white shadow-3xl text-center placeholder:text-slate-800"
               value={instId}
               onChange={(e) => setInstId(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearchInst()}
             />
             <button 
               onClick={handleSearchInst}
@@ -124,7 +137,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
                  <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-800"></div></div>
                  <span className="relative bg-slate-900 px-4 text-[9px] font-black uppercase text-slate-700 tracking-widest">Registry Access</span>
               </div>
-              <button className="w-full bg-blue-600 hover:bg-blue-500 text-white py-8 rounded-[3rem] font-black uppercase tracking-widest text-lg transition-all shadow-xl shadow-blue-600/20 border-b-8 border-blue-800 active:translate-y-1 active:border-b-0">
+              <button 
+                onClick={() => {
+                  alert("Please contact your Institute Administrator to finalize enrollment or use the staff terminal.");
+                }}
+                className="w-full bg-blue-600 hover:bg-blue-500 text-white py-8 rounded-[3rem] font-black uppercase tracking-widest text-lg transition-all shadow-xl shadow-blue-600/20 border-b-8 border-blue-800 active:translate-y-1 active:border-b-0"
+              >
                 Enroll New Student
               </button>
             </div>
@@ -143,9 +161,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
             </div>
             <form onSubmit={handleStaffLogin} className="space-y-4">
               <input 
-                type="email" 
+                type="text" 
                 required 
-                placeholder="EMAIL ADDRESS" 
+                placeholder="USERNAME / EMAIL" 
                 className="w-full bg-slate-950 border border-slate-800 rounded-3xl px-8 py-5 font-black text-xs uppercase text-white shadow-inner focus:border-blue-600 transition-all outline-none"
                 value={loginForm.email}
                 onChange={e => setLoginForm({...loginForm, email: e.target.value})}
@@ -158,8 +176,15 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
                 value={loginForm.password}
                 onChange={e => setLoginForm({...loginForm, password: e.target.value})}
               />
+              
+              {loginError && (
+                <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl">
+                  <p className="text-[9px] font-black uppercase text-rose-500 text-center leading-relaxed">{loginError}</p>
+                </div>
+              )}
+
               <button className="w-full bg-blue-600 text-white py-6 rounded-3xl font-black uppercase tracking-tighter text-lg shadow-xl shadow-blue-600/10 border-b-4 border-blue-800 mt-6 active:translate-y-1 active:border-b-0">AUTHORIZE SESSION</button>
-              <button type="button" onClick={() => setShowStaffLogin(false)} className="w-full text-slate-600 font-black uppercase text-[9px] tracking-[0.4em] mt-6">Cancel</button>
+              <button type="button" onClick={() => { setShowStaffLogin(false); setLoginError(null); }} className="w-full text-slate-600 font-black uppercase text-[9px] tracking-[0.4em] mt-6">Cancel</button>
             </form>
           </div>
         </div>
